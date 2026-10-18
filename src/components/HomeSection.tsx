@@ -211,7 +211,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
                 <span className="text-xs text-emerald-300 block uppercase tracking-wider font-semibold">
                   Aktivitas 03
                 </span>
-                <span className="text-base font-bold">Rekapitulasi 48 Peserta</span>
+                <span className="text-base font-bold">Rekapitulasi {totalParticipants} Peserta</span>
               </div>
               <ArrowRight className="w-5 h-5 text-emerald-300 group-hover:translate-x-1 transition-transform" />
             </button>

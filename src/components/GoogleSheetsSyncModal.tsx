@@ -427,7 +427,7 @@ function doPost(e) {
                     </div>
                     <div>
                       <span className="text-slate-500 block">Tab 3:</span>
-                      <span className="font-semibold text-slate-800">Rekap 48 Peserta</span>
+                      <span className="font-semibold text-slate-800">Rekap Nilai ({participants.length} Peserta)</span>
                     </div>
                   </div>
 
@@ -508,7 +508,7 @@ function doPost(e) {
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
                       Sistem akan membuat file spreadsheet baru dengan struktur 3 tab lengkap:
-                      Presensi, Pengumpulan Tugas, dan Rekapitulasi 48 Peserta.
+                      Presensi, Pengumpulan Tugas, dan Rekapitulasi Nilai ({participants.length} Peserta).
                     </p>
 
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">

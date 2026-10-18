@@ -3,7 +3,7 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v3',
+  PARTICIPANTS: 'diklat_perpus_participants_v4',
   ATTENDANCE: 'diklat_perpus_attendance_v3',
   SUBMISSIONS: 'diklat_perpus_submissions_v3',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v3',
@@ -11,9 +11,14 @@ const STORAGE_KEYS = {
 
 // Clean up legacy demo keys so the app starts completely clean for live production
 try {
-  ['diklat_perpus_attendance', 'diklat_perpus_attendance_v2', 'diklat_perpus_submissions', 'diklat_perpus_submissions_v2'].forEach(
-    (key) => localStorage.removeItem(key)
-  );
+  [
+    'diklat_perpus_attendance',
+    'diklat_perpus_attendance_v2',
+    'diklat_perpus_submissions',
+    'diklat_perpus_submissions_v2',
+    'diklat_perpus_participants_v2',
+    'diklat_perpus_participants_v3',
+  ].forEach((key) => localStorage.removeItem(key));
 } catch {
   // ignore
 }
@@ -23,11 +28,14 @@ export const getStoredParticipants = (): Participant[] => {
     const data = localStorage.getItem(STORAGE_KEYS.PARTICIPANTS);
     if (data) {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length >= INITIAL_PARTICIPANTS.length) {
+        return parsed;
+      }
     }
   } catch (err) {
     console.error('Failed to load participants from localStorage', err);
   }
+  saveParticipants(INITIAL_PARTICIPANTS);
   return INITIAL_PARTICIPANTS;
 };
 

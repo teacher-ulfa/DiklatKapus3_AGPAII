@@ -166,7 +166,7 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
             Rekapitulasi Presensi & Tugas Peserta
           </h1>
           <p className="text-sm text-slate-600 mt-1 max-w-3xl">
-            Tabel induk rekapitulasi penilaian komprehensif 48 peserta Diklat Kepala Perpustakaan DPW AGPAII Jatim & UPT Perpustakaan UIN SATU Tulungagung.
+            Tabel induk rekapitulasi penilaian komprehensif {participants.length} peserta Diklat Kepala Perpustakaan DPW AGPAII Jatim & UPT Perpustakaan UIN SATU Tulungagung.
           </p>
         </div>
 

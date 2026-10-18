@@ -66,7 +66,7 @@ export const createDiklatSpreadsheet = async (
       },
       {
         properties: {
-          title: 'Rekapitulasi 48 Peserta',
+          title: 'Rekapitulasi Nilai Peserta',
           gridProperties: {
             frozenRowCount: 1,
           },
@@ -167,7 +167,7 @@ export const initializeSheetHeaders = async (accessToken: string, spreadsheetId:
       values: [tugasHeaders],
     },
     {
-      range: "'Rekapitulasi 48 Peserta'!A1:J1",
+      range: "'Rekapitulasi Nilai Peserta'!A1:J1",
       values: [rekapHeaders],
     },
   ];
@@ -383,7 +383,7 @@ export const syncAllDataToGoogleSheet = async (
       values: tugasRows.length > 0 ? tugasRows : [['-']],
     },
     {
-      range: `'Rekapitulasi 48 Peserta'!A2:J${Math.max(rekapRows.length + 1, 100)}`,
+      range: `'Rekapitulasi Nilai Peserta'!A2:J${Math.max(rekapRows.length + 1, 100)}`,
       values: rekapRows,
     },
   ];

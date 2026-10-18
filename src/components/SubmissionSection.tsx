@@ -417,7 +417,7 @@ export const SubmissionSection: React.FC<SubmissionSectionProps> = ({
             {/* 1. Pilih Peserta */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Pilih Nama Peserta (Total 48 Peserta) <span className="text-rose-500">*</span>
+                Pilih Nama Peserta (Total {participants.length} Peserta) <span className="text-rose-500">*</span>
               </label>
 
               <div className="space-y-2">

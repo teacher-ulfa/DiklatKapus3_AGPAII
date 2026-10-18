@@ -481,4 +481,25 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     city: 'Kepulauan Riau (Ibu Kota Tanjung Pinang)',
     province: 'Kepulauan Riau',
   },
+  {
+    id: 49,
+    no: 49,
+    name: 'RIZKY ISTNAINIS SHOLEKHA',
+    status: 'Guru Pendidikan Agama Islam',
+    kepalaPerpusStatus: 'Belum',
+    institution: 'UPTD SDN BULUKAGUNG 2',
+    city: 'Kabupaten Bangkalan',
+    province: 'Jawa Timur',
+  },
+  {
+    id: 50,
+    no: 50,
+    name: 'MUZAYANATUL ULFA ROHMATIN',
+    status: 'Guru Pendidikan Agama Islam',
+    kepalaPerpusStatus: 'Belum',
+    institution: 'SD Negeri Paras 2',
+    city: 'Kabupaten Ngawi',
+    province: 'Jawa Timur',
+  },
 ];
+
