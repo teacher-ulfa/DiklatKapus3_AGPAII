@@ -1,13 +1,15 @@
 import React from 'react';
 import { ActiveTab } from '../types';
 import { AGPAII_LOGO_URL, UIN_LOGO_URL, DRIVE_MODUL_URL } from '../data/diklatData';
-import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink } from 'lucide-react';
+import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink, FileSpreadsheet } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
   isAdminMode: boolean;
   onToggleAdmin: () => void;
+  onOpenSpreadsheetModal: () => void;
+  isSpreadsheetConnected: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onTabChange,
   isAdminMode,
   onToggleAdmin,
+  onOpenSpreadsheetModal,
+  isSpreadsheetConnected,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -102,8 +106,25 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Modul Drive Link & Admin Mode Toggle */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Zone 3: Modul Drive Link, Google Sheets Sync & Admin Mode */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Google Sheets Trigger */}
+            <button
+              onClick={onOpenSpreadsheetModal}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap border shadow-sm ${
+                isSpreadsheetConnected
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                  : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300'
+              }`}
+              title="Kelola Sinkronisasi Google Sheets"
+            >
+              <FileSpreadsheet className={`w-3.5 h-3.5 ${isSpreadsheetConnected ? 'text-emerald-200' : 'text-emerald-600'}`} />
+              <span className="hidden sm:inline">Spreadsheet</span>
+              {isSpreadsheetConnected && (
+                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" title="Terkoneksi" />
+              )}
+            </button>
+
             <a
               href={DRIVE_MODUL_URL}
               target="_blank"
@@ -112,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
               title="Buka Folder Google Drive Modul dan Bahan Ajar PPT"
             >
               <FolderOpen className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Modul & PPT (Drive)</span>
+              <span>Modul & PPT</span>
               <ExternalLink className="w-3 h-3 text-emerald-600" />
             </a>
 
@@ -125,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Shield className="w-3.5 h-3.5" />
-              <span>{isAdminMode ? 'Mode Panitia (Aktif)' : 'Panel Panitia'}</span>
+              <span>{isAdminMode ? 'Panitia (Aktif)' : 'Panel Panitia'}</span>
             </button>
           </div>
         </div>
@@ -171,6 +192,16 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             Cek Mandiri
+          </button>
+          <button
+            onClick={onOpenSpreadsheetModal}
+            className={`px-2.5 py-1 text-xs rounded whitespace-nowrap font-semibold border flex items-center gap-1 shrink-0 ${
+              isSpreadsheetConnected
+                ? 'bg-emerald-700 text-white border-emerald-800'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}
+          >
+            <FileSpreadsheet className="w-3 h-3" /> Sheets
           </button>
           <a
             href={DRIVE_MODUL_URL}

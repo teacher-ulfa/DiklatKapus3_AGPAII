@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Participant, AttendanceRecord, TaskSubmission } from '../types';
 import { DIKLAT_SESSIONS, DIKLAT_TASKS } from '../data/diklatData';
 import { generateRecapCSV, downloadCSV } from '../utils/export';
+import { SpreadsheetConfig } from '../services/googleSheets';
 import {
   FileSpreadsheet,
   Printer,
@@ -18,6 +19,8 @@ import {
   Eye,
   Download,
   AlertCircle,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 
 interface RecapSectionProps {
@@ -26,6 +29,8 @@ interface RecapSectionProps {
   submissions: TaskSubmission[];
   onOpenParticipantModal: (participant: Participant) => void;
   onOpenPrintReport: () => void;
+  onOpenSpreadsheetModal: () => void;
+  spreadsheetConfig: SpreadsheetConfig | null;
 }
 
 export const RecapSection: React.FC<RecapSectionProps> = ({
@@ -34,6 +39,8 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
   submissions,
   onOpenParticipantModal,
   onOpenPrintReport,
+  onOpenSpreadsheetModal,
+  spreadsheetConfig,
 }) => {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -165,8 +172,23 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
+            onClick={onOpenSpreadsheetModal}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg transition-colors shadow-sm border ${
+              spreadsheetConfig
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            <span>{spreadsheetConfig ? 'Kelola Google Sheets' : 'Kirim ke Google Sheets'}</span>
+            {spreadsheetConfig && (
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+            )}
+          </button>
+
+          <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Ekspor Excel (CSV)</span>
@@ -181,6 +203,46 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Google Sheets Connection Banner */}
+      {spreadsheetConfig && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <FileSpreadsheet className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-900">
+                  {spreadsheetConfig.spreadsheetTitle}
+                </span>
+                <span className="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                  Cloud Live Sync
+                </span>
+              </div>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Data presensi ({attendance.length}) dan pengumpulan tugas ({submissions.length}) terhubung ke spreadsheet ini.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={spreadsheetConfig.spreadsheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-100 text-emerald-900 text-xs font-bold rounded-lg border border-emerald-300 transition shadow-xs"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Buka File
+            </a>
+            <button
+              onClick={onOpenSpreadsheetModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg transition shadow-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Sinkronkan / Pengaturan
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Recap Summary Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

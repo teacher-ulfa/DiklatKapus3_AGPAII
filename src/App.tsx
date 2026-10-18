@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { User } from 'firebase/auth';
 import { ActiveTab, Participant, AttendanceRecord, TaskSubmission } from './types';
 import {
   getStoredParticipants,
@@ -14,6 +15,15 @@ import {
   resetAllData,
   exportAllDataJSON,
 } from './utils/storage';
+import {
+  SpreadsheetConfig,
+  getSavedSpreadsheetConfig,
+  saveSpreadsheetConfig,
+  appendAttendanceToSheet,
+  appendSubmissionToSheet,
+  forwardToAppsScriptWebhook,
+} from './services/googleSheets';
+import { initAuth, logoutGoogle } from './services/googleAuth';
 import { Header } from './components/Header';
 import { HomeSection } from './components/HomeSection';
 import { AttendanceSection } from './components/AttendanceSection';
@@ -23,6 +33,8 @@ import { CheckMandiriSection } from './components/CheckMandiriSection';
 import { ParticipantProgressModal } from './components/ParticipantProgressModal';
 import { AdminGradingModal } from './components/AdminGradingModal';
 import { OfficialPrintReport } from './components/OfficialPrintReport';
+import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
+import { AdminPinModal } from './components/AdminPinModal';
 import { Footer } from './components/Footer';
 import { Shield, RefreshCw, Download, Check } from 'lucide-react';
 
@@ -32,6 +44,13 @@ export default function App() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
   const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+
+  // Google Workspace Auth & Sheets State (token stored strictly in memory)
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [spreadsheetConfig, setSpreadsheetConfig] = useState<SpreadsheetConfig | null>(null);
+  const [isSpreadsheetModalOpen, setIsSpreadsheetModalOpen] = useState<boolean>(false);
 
   // Modals state
   const [selectedParticipantModal, setSelectedParticipantModal] = useState<Participant | null>(null);
@@ -45,18 +64,37 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+    }, 4500);
   };
 
-  // Load data on mount
+  // Load data & init Google Auth on mount
   useEffect(() => {
     setParticipants(getStoredParticipants());
     setAttendance(getStoredAttendance());
     setSubmissions(getStoredSubmissions());
+    setSpreadsheetConfig(getSavedSpreadsheetConfig());
+
+    // Listen to Firebase Google Auth state change
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setCurrentUser(user);
+        setAccessToken(token);
+      },
+      () => {
+        setCurrentUser(null);
+        setAccessToken(null);
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, []);
 
-  // Handler: Save Attendance
-  const handleSaveAttendance = (newRecord: AttendanceRecord) => {
+  // Handler: Save Attendance with automatic Google Sheets forwarding
+  const handleSaveAttendance = async (newRecord: AttendanceRecord) => {
     setAttendance((prev) => {
       const filtered = prev.filter(
         (a) => !(a.participantId === newRecord.participantId && a.sessionId === newRecord.sessionId)
@@ -65,7 +103,29 @@ export default function App() {
       saveAttendance(updated);
       return updated;
     });
-    showToast(`Presensi ${newRecord.participantName} berhasil disimpan.`);
+
+    // Check if auto-sync to Google Spreadsheet is enabled
+    if (
+      spreadsheetConfig?.autoSync &&
+      accessToken &&
+      spreadsheetConfig.spreadsheetId &&
+      spreadsheetConfig.spreadsheetId !== 'webhook-only'
+    ) {
+      try {
+        await appendAttendanceToSheet(accessToken, spreadsheetConfig.spreadsheetId, newRecord);
+        showToast(`Presensi ${newRecord.participantName} disimpan & terkirim ke Google Sheets!`);
+      } catch (err: any) {
+        console.warn('Google Sheets append warning:', err);
+        showToast(`Presensi disimpan lokal (Google Sheets: ${err.message || 'menunggu sinkronisasi'})`);
+      }
+    } else {
+      showToast(`Presensi ${newRecord.participantName} berhasil disimpan.`);
+    }
+
+    // Forward to Webhook if configured
+    if (spreadsheetConfig?.webhookUrl) {
+      forwardToAppsScriptWebhook(spreadsheetConfig.webhookUrl, 'presensi', newRecord);
+    }
   };
 
   // Handler: Delete Attendance (Admin Only)
@@ -81,8 +141,8 @@ export default function App() {
     }
   };
 
-  // Handler: Save Submission
-  const handleSaveSubmission = (newSub: TaskSubmission) => {
+  // Handler: Save Submission with automatic Google Sheets forwarding
+  const handleSaveSubmission = async (newSub: TaskSubmission) => {
     setSubmissions((prev) => {
       const filtered = prev.filter(
         (s) => !(s.participantId === newSub.participantId && s.taskId === newSub.taskId)
@@ -91,7 +151,30 @@ export default function App() {
       saveSubmissions(updated);
       return updated;
     });
-    showToast(`Tugas ${newSub.title} berhasil disimpan.`);
+
+    // Check if auto-sync to Google Spreadsheet is enabled
+    if (
+      spreadsheetConfig?.autoSync &&
+      accessToken &&
+      spreadsheetConfig.spreadsheetId &&
+      spreadsheetConfig.spreadsheetId !== 'webhook-only'
+    ) {
+      try {
+        const p = participants.find((x) => x.id === newSub.participantId);
+        await appendSubmissionToSheet(accessToken, spreadsheetConfig.spreadsheetId, newSub, p);
+        showToast(`Tugas ${newSub.title} disimpan & terkirim ke Google Sheets!`);
+      } catch (err: any) {
+        console.warn('Google Sheets append warning:', err);
+        showToast(`Tugas disimpan lokal (Google Sheets: ${err.message || 'menunggu sinkronisasi'})`);
+      }
+    } else {
+      showToast(`Tugas ${newSub.title} berhasil disimpan.`);
+    }
+
+    // Forward to Webhook if configured
+    if (spreadsheetConfig?.webhookUrl) {
+      forwardToAppsScriptWebhook(spreadsheetConfig.webhookUrl, 'tugas', newSub);
+    }
   };
 
   // Handler: Save Grading from Instructor Modal
@@ -143,8 +226,8 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-slate-700 animate-fade-in">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-slate-700 animate-fade-in max-w-md">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -190,9 +273,15 @@ export default function App() {
         }}
         isAdminMode={isAdminMode}
         onToggleAdmin={() => {
-          setIsAdminMode(!isAdminMode);
-          showToast(!isAdminMode ? 'Mode Panitia Diaktifkan' : 'Mode Panitia Dimatikan');
+          if (isAdminMode) {
+            setIsAdminMode(false);
+            showToast('Mode Panitia ditutup (Kembali ke Mode Peserta)');
+          } else {
+            setIsPinModalOpen(true);
+          }
         }}
+        onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+        isSpreadsheetConnected={!!spreadsheetConfig}
       />
 
       {/* Main Viewport Content */}
@@ -206,6 +295,8 @@ export default function App() {
               setActiveTab(tab);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            spreadsheetConfig={spreadsheetConfig}
+            onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
           />
         )}
 
@@ -215,6 +306,8 @@ export default function App() {
             attendance={attendance}
             onSaveAttendance={handleSaveAttendance}
             onDeleteAttendance={isAdminMode ? handleDeleteAttendance : undefined}
+            spreadsheetConfig={spreadsheetConfig}
+            onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
           />
         )}
 
@@ -225,6 +318,8 @@ export default function App() {
             onSaveSubmission={handleSaveSubmission}
             onOpenGradingModal={(sub) => setGradingSubmission(sub)}
             isAdminMode={isAdminMode}
+            spreadsheetConfig={spreadsheetConfig}
+            onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
           />
         )}
 
@@ -235,6 +330,8 @@ export default function App() {
             submissions={submissions}
             onOpenParticipantModal={(p) => setSelectedParticipantModal(p)}
             onOpenPrintReport={() => setIsPrintReportOpen(true)}
+            onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+            spreadsheetConfig={spreadsheetConfig}
           />
         )}
 
@@ -269,6 +366,40 @@ export default function App() {
           isAdminMode={isAdminMode}
         />
       )}
+
+      {/* Google Sheets Synchronization Modal */}
+      <GoogleSheetsSyncModal
+        isOpen={isSpreadsheetModalOpen}
+        onClose={() => setIsSpreadsheetModalOpen(false)}
+        currentUser={currentUser}
+        accessToken={accessToken}
+        onAuthSuccess={(user, token) => {
+          setCurrentUser(user);
+          setAccessToken(token);
+        }}
+        onAuthLogout={() => {
+          setCurrentUser(null);
+          setAccessToken(null);
+        }}
+        spreadsheetConfig={spreadsheetConfig}
+        onUpdateConfig={(config) => setSpreadsheetConfig(config)}
+        participants={participants}
+        attendance={attendance}
+        submissions={submissions}
+        onShowToast={showToast}
+        isAdminMode={isAdminMode}
+        onRequestAdmin={() => setIsPinModalOpen(true)}
+      />
+
+      {/* Admin PIN Verification Modal */}
+      <AdminPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={() => {
+          setIsAdminMode(true);
+          showToast('Mode Panitia & Instruktur Berhasil Dibuka');
+        }}
+      />
 
       {/* Footer */}
       <Footer />

@@ -8,6 +8,7 @@ import {
   DIKLAT_SESSIONS,
   DIKLAT_TASKS,
 } from '../data/diklatData';
+import { SpreadsheetConfig } from '../services/googleSheets';
 import {
   Calendar,
   Clock,
@@ -26,6 +27,8 @@ import {
   FolderOpen,
   Presentation,
   Download,
+  FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 
 interface HomeSectionProps {
@@ -34,6 +37,8 @@ interface HomeSectionProps {
   submissions: TaskSubmission[];
   onNavigate: (tab: ActiveTab) => void;
   onSelectParticipant?: (participantId: number) => void;
+  spreadsheetConfig?: SpreadsheetConfig | null;
+  onOpenSpreadsheetModal?: () => void;
 }
 
 export const HomeSection: React.FC<HomeSectionProps> = ({
@@ -41,6 +46,8 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
   attendance,
   submissions,
   onNavigate,
+  spreadsheetConfig,
+  onOpenSpreadsheetModal,
 }) => {
   // Calculated stats
   const totalParticipants = participants.length;
@@ -118,6 +125,54 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
               <span>Buka Google Drive</span>
               <ExternalLink className="w-3.5 h-3.5 text-emerald-800" />
             </a>
+          </div>
+
+          {/* Google Sheets Live Sync Banner */}
+          <div className="mb-8 p-3.5 bg-emerald-950/70 border border-emerald-400/30 rounded-xl backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-300 shrink-0">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white">Integrasi Google Spreadsheet</span>
+                  {spreadsheetConfig ? (
+                    <span className="bg-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                      Aktif: {spreadsheetConfig.spreadsheetTitle}
+                    </span>
+                  ) : (
+                    <span className="bg-white/10 text-emerald-200 text-[10px] px-2 py-0.5 rounded">
+                      Tersedia
+                    </span>
+                  )}
+                </div>
+                <p className="text-emerald-200/80 mt-0.5">
+                  Kirim seluruh rekaman presensi dan dokumen tugas secara langsung ke Google Sheets.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {spreadsheetConfig?.spreadsheetUrl && spreadsheetConfig.spreadsheetUrl !== '#' && (
+                <a
+                  href={spreadsheetConfig.spreadsheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-semibold transition flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Buka Sheet
+                </a>
+              )}
+              {onOpenSpreadsheetModal && (
+                <button
+                  onClick={onOpenSpreadsheetModal}
+                  className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{spreadsheetConfig ? 'Kelola Spreadsheet' : 'Hubungkan Spreadsheet'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Quick Action Grid */}

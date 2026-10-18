@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Participant, TaskSubmission, DiklatTask, SubmissionStatus } from '../types';
 import { DIKLAT_TASKS, DRIVE_MODUL_URL } from '../data/diklatData';
+import { SpreadsheetConfig } from '../services/googleSheets';
 import {
   UploadCloud,
   FileText,
@@ -21,6 +22,7 @@ import {
   FileCheck,
   Video,
   Palette,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface SubmissionSectionProps {
@@ -29,6 +31,8 @@ interface SubmissionSectionProps {
   onSaveSubmission: (submission: TaskSubmission) => void;
   onOpenGradingModal?: (submission: TaskSubmission) => void;
   isAdminMode: boolean;
+  spreadsheetConfig?: SpreadsheetConfig | null;
+  onOpenSpreadsheetModal?: () => void;
 }
 
 export const SubmissionSection: React.FC<SubmissionSectionProps> = ({
@@ -37,6 +41,8 @@ export const SubmissionSection: React.FC<SubmissionSectionProps> = ({
   onSaveSubmission,
   onOpenGradingModal,
   isAdminMode,
+  spreadsheetConfig,
+  onOpenSpreadsheetModal,
 }) => {
   // Form State
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | ''>('');
@@ -372,6 +378,42 @@ export const SubmissionSection: React.FC<SubmissionSectionProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Google Sheets Connection Pill */}
+            {spreadsheetConfig ? (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-900">
+                <span className="flex items-center gap-2 font-medium">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>
+                    Terhubung ke <b>{spreadsheetConfig.spreadsheetTitle}</b>
+                    {spreadsheetConfig.autoSync ? ' (Tugas otomatis tercatat di spreadsheet)' : ''}
+                  </span>
+                </span>
+                {onOpenSpreadsheetModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenSpreadsheetModal}
+                    className="text-emerald-700 underline font-semibold hover:text-emerald-900 shrink-0 ml-2"
+                  >
+                    Detail
+                  </button>
+                )}
+              </div>
+            ) : onOpenSpreadsheetModal ? (
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-slate-400" />
+                  <span>Kirim rekap tugas otomatis ke Google Spreadsheet?</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={onOpenSpreadsheetModal}
+                  className="text-emerald-700 font-bold hover:underline shrink-0"
+                >
+                  Hubungkan
+                </button>
+              </div>
+            ) : null}
+
             {/* 1. Pilih Peserta */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">

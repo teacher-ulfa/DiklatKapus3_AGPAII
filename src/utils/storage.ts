@@ -3,11 +3,20 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v2',
-  ATTENDANCE: 'diklat_perpus_attendance_v2',
-  SUBMISSIONS: 'diklat_perpus_submissions_v2',
-  ADMIN_MODE: 'diklat_perpus_admin_mode_v2',
+  PARTICIPANTS: 'diklat_perpus_participants_v3',
+  ATTENDANCE: 'diklat_perpus_attendance_v3',
+  SUBMISSIONS: 'diklat_perpus_submissions_v3',
+  ADMIN_MODE: 'diklat_perpus_admin_mode_v3',
 };
+
+// Clean up legacy demo keys so the app starts completely clean for live production
+try {
+  ['diklat_perpus_attendance', 'diklat_perpus_attendance_v2', 'diklat_perpus_submissions', 'diklat_perpus_submissions_v2'].forEach(
+    (key) => localStorage.removeItem(key)
+  );
+} catch {
+  // ignore
+}
 
 export const getStoredParticipants = (): Participant[] => {
   try {
