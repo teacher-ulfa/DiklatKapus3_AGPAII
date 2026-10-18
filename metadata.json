@@ -1,0 +1,6 @@
+{
+  "name": "Portal Diklat Kepala Perpustakaan - AGPAII Jatim & UIN SATU",
+  "description": "Aplikasi Presensi, Pengumpulan Tugas, dan Rekapitulasi Peserta Diklat Kepala Perpustakaan Sekolah DPW AGPAII Jawa Timur bersama UPT Perpustakaan UIN SATU Tulungagung.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
