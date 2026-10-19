@@ -238,7 +238,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
         </div>
       </div>
 
-      {/* Admin Fast Recovery: Sesi 1 & Sesi 2 Mass Attendance Banner */}
+      {/* Admin Fast Recovery: Sesi 1, 2 & 3 Mass Attendance Banner */}
       {isAdminMode && onRestoreSession1And2 && (
         <div className="bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-blue-500/15 border-2 border-amber-400/50 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -248,14 +248,14 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm text-slate-900">
-                  Pemulihan & Presensi Massal Sesi 1 & 2 ({participants.length} Peserta)
+                  Pemulihan & Presensi Massal Sesi 1, 2 & 3 ({participants.length} Peserta)
                 </span>
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
                   Aksi Cepat Panitia
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b> dan <b>Sesi 2 (Pengorganisasian Informasi)</b>. Klik tombol di sebelah kanan untuk memastikan seluruh {participants.length} peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
+                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b>, <b>Sesi 2 (Pengorganisasian Informasi)</b>, dan <b>Sesi 3 (Manajemen Kelembagaan)</b> hari ini. Klik tombol di sebelah kanan untuk memastikan seluruh {participants.length} peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
               </p>
             </div>
           </div>
@@ -266,7 +266,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
               className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-lg transition shadow-sm flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Tandai Hadir Semua Sesi 1 & 2 ({participants.length} Peserta)</span>
+              <span>Tandai Hadir Semua Sesi 1, 2 & 3 ({participants.length} Peserta)</span>
             </button>
             {onOpenSpreadsheetModal && (
               <button

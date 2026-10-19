@@ -454,7 +454,7 @@ function doPost(e) {
                   Sudah Punya File Google Spreadsheet? Salin &amp; Tempel dalam 3 Detik!
                 </h3>
                 <p className="text-xs text-emerald-100/90 leading-relaxed">
-                  Semua <b>{attendance.length} data presensi</b> (Sesi 1 &amp; Sesi 2 untuk seluruh {participants.length} peserta) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
+                  Semua <b>{attendance.length} data presensi</b> (Sesi 1, Sesi 2, &amp; Sesi 3 untuk seluruh {participants.length} peserta) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
                 </p>
 
                 <div className="pt-2 flex flex-wrap gap-2.5">

@@ -251,16 +251,16 @@ export default function App() {
     showToast(`Penilaian tugas untuk ${updatedSub.participantName} berhasil disimpan.`);
   };
 
-  // Handler: Recover / Mass Mark Attendance for Sesi 1 & 2
+  // Handler: Recover / Mass Mark Attendance for Sesi 1, 2 & 3
   const handleRestoreSession1And2 = async () => {
     try {
-      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2']);
+      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2', 'sesi-3']);
       if (res && res.attendance) {
         setAttendance(res.attendance);
         saveAttendance(res.attendance);
-        showToast(`Alhamdulillah! Seluruh 52 peserta berhasil ditandai Hadir pada Sesi 1 & 2 di database pusat.`);
+        showToast(`Alhamdulillah! Seluruh ${participants.length} peserta berhasil ditandai Hadir pada Sesi 1, 2 & 3 di database pusat.`);
       } else {
-        showToast('Presensi Sesi 1 & 2 sudah tercatat lengkap di server.');
+        showToast(`Presensi Sesi 1, 2 & 3 sudah tercatat lengkap untuk seluruh ${participants.length} peserta.`);
       }
     } catch (err: any) {
       showToast('Gagal memulihkan presensi: ' + err.message);

@@ -4,7 +4,7 @@ import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
   PARTICIPANTS: 'diklat_perpus_participants_v8',
-  ATTENDANCE: 'diklat_perpus_attendance_v5',
+  ATTENDANCE: 'diklat_perpus_attendance_v8',
   SUBMISSIONS: 'diklat_perpus_submissions_v5',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v4',
 };
@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
 export const getAllLocalAttendanceToRecover = (): AttendanceRecord[] => {
   const recovered: AttendanceRecord[] = [];
   const keys = [
+    'diklat_perpus_attendance_v8',
+    'diklat_perpus_attendance_v7',
+    'diklat_perpus_attendance_v6',
     'diklat_perpus_attendance_v5',
     'diklat_perpus_attendance_v4',
     'diklat_perpus_attendance_v3',
@@ -108,11 +111,26 @@ export const getStoredAttendance = (): AttendanceRecord[] => {
     const data = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
     if (data) {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length >= INITIAL_ATTENDANCE.length) {
+        return parsed;
+      }
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost
+        const merged = [...parsed];
+        INITIAL_ATTENDANCE.forEach((seed) => {
+          const exists = merged.some(
+            (m) => m.participantId === seed.participantId && m.sessionId === seed.sessionId
+          );
+          if (!exists) merged.push(seed);
+        });
+        saveAttendance(merged);
+        return merged;
+      }
     }
   } catch (err) {
     console.error('Failed to load attendance from localStorage', err);
   }
+  saveAttendance(INITIAL_ATTENDANCE);
   return INITIAL_ATTENDANCE;
 };
 

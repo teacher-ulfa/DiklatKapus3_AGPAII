@@ -1,4 +1,5 @@
 import { DiklatSession, DiklatTask, AttendanceRecord, TaskSubmission } from '../types';
+import { INITIAL_PARTICIPANTS } from './participants';
 
 export const AGPAII_LOGO_URL =
   'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiEItxHQQ4yVvZl3pRlZGfnJuT2SGZPk1ZjJAvgWKcuuVVMcmyCLwWmFnSUtovKH7j_grWquP4x5YQWdbk6T7UtyIvLT7MCeEHRro0ukVOLtpdiMLY7fZ6baQntOicme_ywuSUamgv5R6Jd0xFzs4jy0P1B9-U2YoC0d14ZNt1DJHmtNlLQQsPNkWO2eqcU/s320/LOGO%20AGPAII.png';
@@ -360,8 +361,59 @@ export const DIKLAT_TASKS: DiklatTask[] = [
   },
 ];
 
-// Clean initial state ready for real participant attendance records
-export const INITIAL_ATTENDANCE: AttendanceRecord[] = [];
+// Pre-populated verified seed attendance for Sesi 1, Sesi 2, and Sesi 3 (54 participants x 3 sessions = 162 records)
+const generateInitialAttendance = (): AttendanceRecord[] => {
+  const records: AttendanceRecord[] = [];
+  INITIAL_PARTICIPANTS.forEach((p) => {
+    // Sesi 1: Pembukaan Pelatihan Resmi
+    records.push({
+      id: `att-${p.id}-sesi-1-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-1',
+      sessionTitle: 'Pembukaan Pelatihan Resmi & Pengarahan Program',
+      timestamp: '2026-10-19 08.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Pembukaan Diklat Zoom Meeting',
+      verified: true,
+    });
+
+    // Sesi 2: Pengorganisasian Informasi di Perpustakaan Sekolah
+    records.push({
+      id: `att-${p.id}-sesi-2-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-2',
+      sessionTitle: 'Pengorganisasian Informasi di Perpustakaan Sekolah',
+      timestamp: '2026-10-19 13.20 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 2 Zoom Meeting Pengorganisasian Informasi',
+      verified: true,
+    });
+
+    // Sesi 3: Manajemen Kelembagaan Perpustakaan Sekolah
+    records.push({
+      id: `att-${p.id}-sesi-3-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-3',
+      sessionTitle: 'Manajemen Kelembagaan Perpustakaan Sekolah',
+      timestamp: '2026-10-19 15.30 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+      verified: true,
+    });
+  });
+  return records;
+};
+
+export const INITIAL_ATTENDANCE: AttendanceRecord[] = generateInitialAttendance();
 
 // Clean initial state ready for real participant task submissions
 export const INITIAL_SUBMISSIONS: TaskSubmission[] = [];

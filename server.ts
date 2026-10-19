@@ -16,11 +16,12 @@ interface StoreData {
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'diklat_store.json');
 
-// Helper to generate seed attendance for Sesi 1 and Sesi 2
-function generateSeedAttendanceForSession1And2(): AttendanceRecord[] {
+// Helper to generate seed attendance for Sesi 1, Sesi 2, and Sesi 3 (54 participants x 3 sessions = 162 records)
+function generateSeedAttendanceForSessions(): AttendanceRecord[] {
   const records: AttendanceRecord[] = [];
   const session1 = DIKLAT_SESSIONS[0]; // Sesi 1 Pembukaan
   const session2 = DIKLAT_SESSIONS[1]; // Sesi 2 Pengorganisasian Informasi
+  const session3 = DIKLAT_SESSIONS[2]; // Sesi 3 Manajemen Kelembagaan
 
   INITIAL_PARTICIPANTS.forEach((p) => {
     // Sesi 1
@@ -52,6 +53,21 @@ function generateSeedAttendanceForSession1And2(): AttendanceRecord[] {
       notes: 'Hadir Sesi 2 Zoom Meeting Pengorganisasian Informasi',
       verified: true,
     });
+
+    // Sesi 3
+    records.push({
+      id: `att-${p.id}-sesi-3-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-3',
+      sessionTitle: session3?.title || 'Manajemen Kelembagaan Perpustakaan Sekolah',
+      timestamp: '2026-10-19 15.30 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+      verified: true,
+    });
   });
 
   return records;
@@ -69,10 +85,11 @@ function loadStore(): StoreData {
       if (!data.attendance) {
         data.attendance = [];
       }
-      // Ensure all participants in INITIAL_PARTICIPANTS have Sesi 1 & 2 seeded
+      // Ensure all participants in INITIAL_PARTICIPANTS have Sesi 1, 2, and 3 seeded
       let hasNewSeed = false;
       const s1 = DIKLAT_SESSIONS[0];
       const s2 = DIKLAT_SESSIONS[1];
+      const s3 = DIKLAT_SESSIONS[2];
 
       INITIAL_PARTICIPANTS.forEach((p) => {
         // Sesi 1
@@ -116,6 +133,27 @@ function loadStore(): StoreData {
           });
           hasNewSeed = true;
         }
+
+        // Sesi 3
+        const hasS3 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-3'
+        );
+        if (!hasS3) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-3-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-3',
+            sessionTitle: s3?.title || 'Manajemen Kelembagaan Perpustakaan Sekolah',
+            timestamp: '2026-10-19 15.30 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
       });
 
       if (hasNewSeed) {
@@ -134,7 +172,7 @@ function loadStore(): StoreData {
 
   // Initial seed
   const initialData: StoreData = {
-    attendance: generateSeedAttendanceForSession1And2(),
+    attendance: generateSeedAttendanceForSessions(),
     submissions: [],
     spreadsheetConfig: null,
   };
@@ -338,10 +376,10 @@ async function startServer() {
     }
   });
 
-  // 8. Admin fast recovery: Fill Sesi 1 & 2 for all 52 participants
+  // 8. Admin fast recovery: Fill Sesi 1, 2 & 3 for all 54 participants
   app.post('/api/admin/mass-attendance-session', (req: Request, res: Response) => {
     try {
-      const { sessionIds = ['sesi-1', 'sesi-2'], participantIds } = req.body;
+      const { sessionIds = ['sesi-1', 'sesi-2', 'sesi-3'], participantIds } = req.body;
       const targetParticipants = participantIds
         ? INITIAL_PARTICIPANTS.filter((p) => participantIds.includes(p.id))
         : INITIAL_PARTICIPANTS;
