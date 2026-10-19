@@ -6,6 +6,7 @@ import {
   AGPAII_LOGO_URL,
   UIN_LOGO_URL,
   DRIVE_MODUL_URL,
+  ZOOM_CONFIG,
 } from '../data/diklatData';
 import {
   Search,
@@ -24,6 +25,7 @@ import {
   FolderOpen,
   ExternalLink,
   Palette,
+  Video,
 } from 'lucide-react';
 
 interface CheckMandiriSectionProps {
@@ -98,30 +100,51 @@ export const CheckMandiriSection: React.FC<CheckMandiriSectionProps> = ({
         </p>
       </div>
 
-      {/* Resource Callout: Modul & PPT */}
-      <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5 text-xs text-emerald-900">
-          <FolderOpen className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>
-            Butuh mempelajari kembali bahan tayang atau modul narasumber? Kunjungi{' '}
-            <strong>Folder Google Drive Modul & Bahan Ajar PPT Diklat</strong>.
-          </span>
+      {/* Resource Callout: Zoom Meeting & Modul Drive */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Zoom Callout */}
+        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs text-blue-950">
+          <div className="flex items-center gap-2.5">
+            <Video className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>
+              Ruang Zoom Meeting Diklat: <b>ID {ZOOM_CONFIG.meetingId}</b> · Sandi: <b>{ZOOM_CONFIG.passcode}</b>
+            </span>
+          </div>
+          <a
+            href={ZOOM_CONFIG.joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition shadow-xs shrink-0"
+          >
+            <span>Masuk Zoom</span>
+            <ExternalLink className="w-3 h-3 text-blue-200" />
+          </a>
         </div>
-        <a
-          href={DRIVE_MODUL_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-white px-3 py-1.5 rounded-lg border border-emerald-300 shadow-sm shrink-0"
-        >
-          <span>Akses Drive</span>
-          <ExternalLink className="w-3 h-3 text-emerald-600" />
-        </a>
+
+        {/* Modul Drive Callout */}
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-950">
+          <div className="flex items-center gap-2.5">
+            <FolderOpen className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span>
+              Materi & Slide Narasumber: <b>Folder Google Drive Diklat</b>
+            </span>
+          </div>
+          <a
+            href={DRIVE_MODUL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-white px-3 py-1.5 rounded-lg border border-emerald-300 shadow-xs shrink-0"
+          >
+            <span>Akses Drive</span>
+            <ExternalLink className="w-3 h-3 text-emerald-600" />
+          </a>
+        </div>
       </div>
 
       {/* Selector Strip */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-          Pilih / Cari Nama Anda Dari Daftar 48 Peserta
+          Pilih / Cari Nama Anda Dari Daftar {participants.length} Peserta
         </label>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           <div className="md:col-span-4 relative">

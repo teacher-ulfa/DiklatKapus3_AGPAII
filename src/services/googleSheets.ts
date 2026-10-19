@@ -33,7 +33,7 @@ export const saveSpreadsheetConfig = (config: SpreadsheetConfig | null) => {
  * Creates a brand new Google Spreadsheet with three prepared tabs:
  * 1. Presensi Diklat
  * 2. Pengumpulan Tugas
- * 3. Rekapitulasi 48 Peserta
+ * 3. Rekapitulasi Nilai Peserta
  */
 export const createDiklatSpreadsheet = async (
   accessToken: string,
@@ -342,7 +342,7 @@ export const syncAllDataToGoogleSheet = async (
     ];
   });
 
-  // 4. Prepare Master Recap Rows for 48 participants
+  // 4. Prepare Master Recap Rows for all participants ({participants.length})
   const rekapRows = participants.map((p, idx) => {
     const pAtt = attendanceList.filter((a) => a.participantId === p.id && a.status === 'Hadir');
     const pSub = submissionsList.filter((s) => s.participantId === p.id);

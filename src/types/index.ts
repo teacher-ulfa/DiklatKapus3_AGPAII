@@ -20,6 +20,9 @@ export interface DiklatSession {
   description: string;
   topics: string[];
   isOpen: boolean;
+  zoomUrl?: string;
+  meetingId?: string;
+  passcode?: string;
 }
 
 export interface DiklatTask {

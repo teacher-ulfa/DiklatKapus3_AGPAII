@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Participant, AttendanceRecord, AttendanceStatus } from '../types';
-import { DIKLAT_SESSIONS } from '../data/diklatData';
+import { DIKLAT_SESSIONS, ZOOM_CONFIG } from '../data/diklatData';
 import { SignaturePad } from './SignaturePad';
 import { SpreadsheetConfig } from '../services/googleSheets';
 import {
@@ -18,6 +18,8 @@ import {
   Check,
   RefreshCw,
   FileSpreadsheet,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AttendanceSectionProps {
@@ -27,6 +29,7 @@ interface AttendanceSectionProps {
   onDeleteAttendance?: (id: string) => void;
   spreadsheetConfig?: SpreadsheetConfig | null;
   onOpenSpreadsheetModal?: () => void;
+  onOpenZoomModal?: () => void;
 }
 
 export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
@@ -36,6 +39,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   onDeleteAttendance,
   spreadsheetConfig,
   onOpenSpreadsheetModal,
+  onOpenZoomModal,
 }) => {
   // Form State
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | ''>('');
@@ -195,6 +199,44 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Zoom Meeting Live Notification Banner */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-950">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-blue-600 text-white rounded-md shrink-0">
+                  <Video className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold block text-blue-900">
+                    Ruang Zoom Meeting Sesi Sinkronus
+                  </span>
+                  <span className="text-[11px] text-blue-800">
+                    ID: <b className="font-mono text-blue-950">{ZOOM_CONFIG.meetingId}</b> · Passcode: <b className="font-mono text-blue-950">{ZOOM_CONFIG.passcode}</b>
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={ZOOM_CONFIG.joinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md transition text-xs shadow-xs"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Masuk Zoom</span>
+                  <ExternalLink className="w-3 h-3 text-blue-200" />
+                </a>
+                {onOpenZoomModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenZoomModal}
+                    className="text-blue-700 hover:underline font-semibold text-xs"
+                  >
+                    Detail
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Google Sheets Connection Pill */}
             {spreadsheetConfig ? (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-900">

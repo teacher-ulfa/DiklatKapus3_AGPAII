@@ -4,6 +4,7 @@ import {
   AGPAII_LOGO_URL,
   UIN_LOGO_URL,
   DRIVE_MODUL_URL,
+  ZOOM_CONFIG,
   DIKLAT_INFO,
   DIKLAT_SESSIONS,
   DIKLAT_TASKS,
@@ -29,6 +30,7 @@ import {
   Download,
   FileSpreadsheet,
   RefreshCw,
+  Video,
 } from 'lucide-react';
 
 interface HomeSectionProps {
@@ -39,6 +41,7 @@ interface HomeSectionProps {
   onSelectParticipant?: (participantId: number) => void;
   spreadsheetConfig?: SpreadsheetConfig | null;
   onOpenSpreadsheetModal?: () => void;
+  onOpenZoomModal?: () => void;
 }
 
 export const HomeSection: React.FC<HomeSectionProps> = ({
@@ -48,6 +51,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
   onNavigate,
   spreadsheetConfig,
   onOpenSpreadsheetModal,
+  onOpenZoomModal,
 }) => {
   // Calculated stats
   const totalParticipants = participants.length;
@@ -96,6 +100,52 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
           <p className="text-base sm:text-lg text-emerald-100/90 max-w-3xl leading-relaxed mb-6">
             Pola 120 Jam Pelajaran (26 JP Teori, 94 JP Praktik) berstandar nasional perpustakaan. Sistem informasi presensi sesi, tagihan 8 tugas praktik resmi, dan rekapitulasi penilaian peserta.
           </p>
+
+          {/* Ruang Zoom Meeting Utama Callout Banner (Berlaku Pembukaan hingga Penutupan) */}
+          <div className="mb-4 p-4 bg-gradient-to-r from-blue-900/90 via-indigo-950/90 to-blue-900/90 border-2 border-blue-400/50 rounded-xl backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="p-3 bg-blue-500/25 rounded-xl text-blue-200 shrink-0 border border-blue-400/30">
+                <Video className="w-6 h-6 sm:w-7 sm:h-7" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className="font-extrabold text-sm sm:text-base text-white">
+                    Ruang Zoom Meeting Pelatihan (Sinkronus 120 JP)
+                  </span>
+                  <span className="bg-emerald-400/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/40 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Berlaku Selama Kegiatan
+                  </span>
+                </div>
+                <p className="text-xs text-blue-200/90 leading-relaxed max-w-xl">
+                  Tautan resmi pembukaan s.d. penutupan diklat. ID: <b className="font-mono text-white tracking-wider">{ZOOM_CONFIG.meetingId}</b> · Passcode: <b className="font-mono text-white tracking-wider">{ZOOM_CONFIG.passcode}</b>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <a
+                href={ZOOM_CONFIG.joinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs rounded-lg transition-all shadow-md hover:shadow-lg shrink-0"
+              >
+                <Video className="w-4 h-4" />
+                <span>Masuk Zoom</span>
+                <ExternalLink className="w-3.5 h-3.5 text-blue-200" />
+              </a>
+              {onOpenZoomModal && (
+                <button
+                  type="button"
+                  onClick={onOpenZoomModal}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-lg transition border border-white/20 shrink-0"
+                  title="Lihat Kredensial Meeting ID & Passcode"
+                >
+                  <span>Detail & Salin</span>
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Modul & Bahan Ajar Link Callout Banner */}
           <div className="mb-8 p-4 bg-emerald-800/60 border border-emerald-500/40 rounded-xl backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -320,6 +370,16 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
                       {session.date} · {session.time}
                     </span>
                   </div>
+                  <a
+                    href={session.zoomUrl || ZOOM_CONFIG.joinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition shrink-0"
+                    title="Masuk Ruang Zoom Sesi Ini"
+                  >
+                    <Video className="w-3 h-3 text-blue-600" />
+                    <span>Zoom Sesi</span>
+                  </a>
                 </div>
 
                 <h3 className="text-sm font-bold text-slate-900 mb-1">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActiveTab } from '../types';
-import { AGPAII_LOGO_URL, UIN_LOGO_URL, DRIVE_MODUL_URL } from '../data/diklatData';
-import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink, FileSpreadsheet } from 'lucide-react';
+import { AGPAII_LOGO_URL, UIN_LOGO_URL, DRIVE_MODUL_URL, ZOOM_CONFIG } from '../data/diklatData';
+import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink, FileSpreadsheet, Video } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -10,6 +10,7 @@ interface HeaderProps {
   onToggleAdmin: () => void;
   onOpenSpreadsheetModal: () => void;
   isSpreadsheetConnected: boolean;
+  onOpenZoomModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleAdmin,
   onOpenSpreadsheetModal,
   isSpreadsheetConnected,
+  onOpenZoomModal,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -106,8 +108,20 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Modul Drive Link, Google Sheets Sync & Admin Mode */}
+          {/* Zone 3: Zoom Meeting, Modul Drive Link, Google Sheets Sync & Admin Mode */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Zoom Meeting Trigger */}
+            <button
+              onClick={onOpenZoomModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors whitespace-nowrap shadow-sm"
+              title="Informasi & Tautan Zoom Meeting Diklat"
+            >
+              <Video className="w-3.5 h-3.5 text-blue-100" />
+              <span className="hidden sm:inline">Zoom Meeting</span>
+              <span className="sm:hidden">Zoom</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Ruang Zoom Aktif" />
+            </button>
+
             {/* Google Sheets Trigger */}
             <button
               onClick={onOpenSpreadsheetModal}
@@ -192,6 +206,12 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             Cek Mandiri
+          </button>
+          <button
+            onClick={onOpenZoomModal}
+            className="px-2.5 py-1 text-xs rounded whitespace-nowrap bg-blue-600 text-white font-semibold flex items-center gap-1 shrink-0 shadow-xs"
+          >
+            <Video className="w-3 h-3 text-blue-100" /> Zoom
           </button>
           <button
             onClick={onOpenSpreadsheetModal}

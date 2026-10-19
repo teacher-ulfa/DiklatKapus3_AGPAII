@@ -157,7 +157,7 @@ export const OfficialPrintReport: React.FC<OfficialPrintReportProps> = ({
           </div>
         </div>
 
-        {/* Table of 48 Participants */}
+        {/* Table of Participants */}
         <div className="overflow-x-auto mb-8">
           <table className="w-full text-left text-[11px] border border-slate-300 border-collapse">
             <thead>

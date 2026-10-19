@@ -501,5 +501,15 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     city: 'Kabupaten Ngawi',
     province: 'Jawa Timur',
   },
+  {
+    id: 51,
+    no: 51,
+    name: 'MUHAMMAD RIJAL MAHFUDH',
+    status: 'Kepala Perpustakaan',
+    kepalaPerpusStatus: 'Belum',
+    institution: 'MA NURIDDAHLANI',
+    city: 'Kabupaten Probolinggo',
+    province: 'Jawa Timur',
+  },
 ];
 

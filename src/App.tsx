@@ -35,6 +35,7 @@ import { AdminGradingModal } from './components/AdminGradingModal';
 import { OfficialPrintReport } from './components/OfficialPrintReport';
 import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
 import { AdminPinModal } from './components/AdminPinModal';
+import { ZoomModal } from './components/ZoomModal';
 import { Footer } from './components/Footer';
 import { Shield, RefreshCw, Download, Check } from 'lucide-react';
 
@@ -45,6 +46,9 @@ export default function App() {
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
   const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+
+  // Zoom Meeting Modal State
+  const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
 
   // Google Workspace Auth & Sheets State (token stored strictly in memory)
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -282,6 +286,7 @@ export default function App() {
         }}
         onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
         isSpreadsheetConnected={!!spreadsheetConfig}
+        onOpenZoomModal={() => setIsZoomModalOpen(true)}
       />
 
       {/* Main Viewport Content */}
@@ -297,6 +302,7 @@ export default function App() {
             }}
             spreadsheetConfig={spreadsheetConfig}
             onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+            onOpenZoomModal={() => setIsZoomModalOpen(true)}
           />
         )}
 
@@ -308,6 +314,7 @@ export default function App() {
             onDeleteAttendance={isAdminMode ? handleDeleteAttendance : undefined}
             spreadsheetConfig={spreadsheetConfig}
             onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+            onOpenZoomModal={() => setIsZoomModalOpen(true)}
           />
         )}
 
@@ -399,6 +406,12 @@ export default function App() {
           setIsAdminMode(true);
           showToast('Mode Panitia & Instruktur Berhasil Dibuka');
         }}
+      />
+
+      {/* Zoom Meeting Info & Join Modal */}
+      <ZoomModal
+        isOpen={isZoomModalOpen}
+        onClose={() => setIsZoomModalOpen(false)}
       />
 
       {/* Footer */}

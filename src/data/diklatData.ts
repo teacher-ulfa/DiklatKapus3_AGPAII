@@ -9,6 +9,18 @@ export const UIN_LOGO_URL =
 export const DRIVE_MODUL_URL =
   'https://drive.google.com/drive/folders/1CNOcR-MC3BZ5RmcrllrG2kB62ynSqLdJ?usp=sharing';
 
+// Tautan Resmi Zoom Meeting Diklat (Berlaku dari Pembukaan hingga Penutupan)
+export const ZOOM_CONFIG = {
+  joinUrl:
+    'https://us06web.zoom.us/j/87463474090?pwd=xC6XM7xyt0OHEa62ZayJbDywqZqgWx.1',
+  meetingId: '874 6347 4090',
+  meetingIdRaw: '87463474090',
+  passcode: '997524',
+  roomTitle: 'Ruang Zoom Utama Diklat Kepala Perpustakaan',
+  validity:
+    'Berlaku selama seluruh rangkaian kegiatan berlangsung (mulai pembukaan hingga penutupan resmi)',
+};
+
 export const DIKLAT_INFO = {
   title: 'Pendidikan dan Pelatihan Kepala Perpustakaan Sekolah',
   subtitle: 'Pola 120 Jam Pelajaran (26 JP Teori, 94 JP Praktik)',
@@ -17,6 +29,9 @@ export const DIKLAT_INFO = {
   cooperationNote: 'Kementerian Agama Republik Indonesia · Universitas Islam Negeri Sayyid Ali Rahmatullah Tulungagung bekerjasama dengan DPW AGPAII Jawa Timur',
   dates: '19 - 29 Oktober 2026',
   modality: 'Hybrid Training (Zoom Meeting Sinkronus & Praktik Terbimbing Asinkronus WA Group)',
+  zoomUrl: ZOOM_CONFIG.joinUrl,
+  zoomMeetingId: ZOOM_CONFIG.meetingId,
+  zoomPasscode: ZOOM_CONFIG.passcode,
   contactPhone: '+62 812-3456-7890 (Sekretariat DPW AGPAII Jatim & UPT Perpustakaan UIN SATU)',
   contactEmail: 'perpustakaan@uinsatu.ac.id / diklat.perpus.agpaiijatim@gmail.com',
   certCriteria: 'Kelulusan dan penerbitan sertifikat pelatihan 120 JP dinilai berdasarkan akumulasi kehadiran sesi Zoom, keaktifan dalam grup praktik, serta ketepatan waktu dan kualitas luaran 8 tugas praktik yang dikumpulkan.',
@@ -38,6 +53,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Pembukaan resmi Diklat Kepala Perpustakaan Sekolah oleh Rektor UIN SATU dilanjutkan pengarahan teknis program pelatihan 120 JP.',
     topics: ['Arah Kebijakan Kampus & Kemenag', 'Kurikulum 120 JP', 'Building Learning Commitment (BLC)'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-2',
@@ -50,6 +68,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Konsep pengorganisasian data informasi perpustakaan, digitalisasi katalog, audit infrastruktur TI, dan cetak biru otomasi perpustakaan sekolah.',
     topics: ['Audit Perangkat Keras & Lunak', 'Blueprint Sistem Informasi', 'Otomasi Perpustakaan'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-3',
@@ -62,6 +83,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Tata pamong kelembagaan, analisis SWOT internal-eksternal sekolah, struktur organisasi, dan perumusan strategi mutu perpustakaan.',
     topics: ['Tata Pamong Kelembagaan', 'Analisis SWOT Strategis', 'Penyusunan Program Kerja'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-4',
@@ -74,6 +98,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Pemetaan koleksi bahan pustaka berbasis kebutuhan pengguna (user-centered collection), survei aspirasi wali kelas, dan prioritas belanja koleksi.',
     topics: ['User-Centered Collection', 'Analisis Kesenjangan Koleksi', 'Prioritas Pengadaan Buku'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-5',
@@ -86,6 +113,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Pemasaran perpustakaan (library marketing), perancangan media komunikasi visual luar ruang (X-Banner), dan strategi peningkatan literasi sekolah.',
     topics: ['Library Marketing', 'Desain X-Banner Publikasi', 'Kampanye Gemar Membaca'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-6',
@@ -98,6 +128,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Penguatan nilai-nilai moderasi beragama, kepedulian lingkungan (ekoteologi), dan etika kepemimpinan islami di lingkungan perpustakaan madrasah/sekolah.',
     topics: ['Nilai Moderasi Beragama', 'Prinsip Ekoteologi Perpustakaan', 'Kepemimpinan Transformatif'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-7',
@@ -110,6 +143,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Evaluasi sistem sirkulasi pemustaka: sistem layanan terbuka (open access), tertutup (closed access), dan semi terbuka (semi open access) serta inovasi layanan.',
     topics: ['Open vs Closed Access', 'Alur Efisiensi Sirkulasi', 'Inovasi Kenyamanan Pemustaka'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-8',
@@ -122,6 +158,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Tindakan preventif dan kuratif pelestarian fisik koleksi, pengendalian suhu/kelembapan, pembersihan rak, pencegahan hama/biota, dan SOP preservasi.',
     topics: ['Faktor Risiko Kerusakan', 'Aksi Nyata Perawatan Fisik', 'SOP Preservasi Koleksi'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-9',
@@ -134,6 +173,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Analisis kebutuhan kompetensi tenaga perpustakaan, pembagian beban kerja, serta audit kelayakan sarana prasarana fisik dan fasilitas pendukung.',
     topics: ['Kebutuhan & Kompetensi SDM', 'Audit Sarana & Prasarana', 'Rencana Tindak Lanjut Pengadaan'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
   {
     id: 'sesi-10',
@@ -146,6 +188,9 @@ export const DIKLAT_SESSIONS: DiklatSession[] = [
     description: 'Review komprehensif, evaluasi pembelajaran (Pre/Post-test & Evaluasi Program), verifikasi portofolio tugas, dan upacara penutupan resmi diklat.',
     topics: ['Evaluasi Pembelajaran', 'Finalisasi Luaran Tugas', 'Pelepasan Calon Kepala Perpustakaan'],
     isOpen: true,
+    zoomUrl: ZOOM_CONFIG.joinUrl,
+    meetingId: ZOOM_CONFIG.meetingId,
+    passcode: ZOOM_CONFIG.passcode,
   },
 ];
 
