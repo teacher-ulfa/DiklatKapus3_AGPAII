@@ -3,7 +3,7 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v6',
+  PARTICIPANTS: 'diklat_perpus_participants_v8',
   ATTENDANCE: 'diklat_perpus_attendance_v5',
   SUBMISSIONS: 'diklat_perpus_submissions_v5',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v4',

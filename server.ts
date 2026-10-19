@@ -66,11 +66,62 @@ function loadStore(): StoreData {
     if (fs.existsSync(STORE_FILE)) {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
       const data = JSON.parse(raw);
-      // If store is empty, seed Sesi 1 & Sesi 2
-      if (!data.attendance || data.attendance.length === 0) {
-        data.attendance = generateSeedAttendanceForSession1And2();
+      if (!data.attendance) {
+        data.attendance = [];
+      }
+      // Ensure all participants in INITIAL_PARTICIPANTS have Sesi 1 & 2 seeded
+      let hasNewSeed = false;
+      const s1 = DIKLAT_SESSIONS[0];
+      const s2 = DIKLAT_SESSIONS[1];
+
+      INITIAL_PARTICIPANTS.forEach((p) => {
+        // Sesi 1
+        const hasS1 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-1'
+        );
+        if (!hasS1) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-1-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-1',
+            sessionTitle: s1?.title || 'Pembukaan Pelatihan Resmi & Pengarahan Program',
+            timestamp: '2026-10-19 08.15 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Pembukaan Diklat Zoom Meeting',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
+
+        // Sesi 2
+        const hasS2 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-2'
+        );
+        if (!hasS2) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-2-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-2',
+            sessionTitle: s2?.title || 'Pengorganisasian Informasi di Perpustakaan Sekolah',
+            timestamp: '2026-10-19 13.20 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Sesi 2 Zoom Meeting Pengorganisasian Informasi',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
+      });
+
+      if (hasNewSeed) {
         saveStore(data);
       }
+
       return {
         attendance: data.attendance || [],
         submissions: data.submissions || [],
@@ -106,17 +157,28 @@ function saveStore(data: StoreData): void {
 // In-memory cache
 let store: StoreData = loadStore();
 
-// Forwarder to Google Apps Script Webhook
+// Forwarder to Google Apps Script Webhook (matching Panitia 10-column layout)
 async function forwardWebhook(type: 'presensi' | 'tugas', payload: any) {
   if (!store.spreadsheetConfig?.webhookUrl) return;
   try {
     const webhookUrl = store.spreadsheetConfig.webhookUrl;
+    const participant = INITIAL_PARTICIPANTS.find((p) => p.id === payload.participantId);
+    const session = DIKLAT_SESSIONS.find((s) => s.id === payload.sessionId);
+
+    const enrichedPayload = {
+      ...payload,
+      participantNo: participant?.no || payload.participantId,
+      sessionDate: session?.date || '19 Oktober 2026',
+      sessionCode: session?.code || payload.sessionId,
+      sessionTitle: session?.title || payload.sessionTitle,
+    };
+
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type,
-        data: payload,
+        data: enrichedPayload,
         timestamp: new Date().toISOString(),
       }),
     });
@@ -318,6 +380,55 @@ async function startServer() {
         success: true,
         createdCount,
         attendance: store.attendance,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 9. Batch push all attendance records to Google Apps Script Webhook
+  app.post('/api/webhook/sync-all', async (req: Request, res: Response) => {
+    try {
+      const webhookUrl = req.body.webhookUrl || store.spreadsheetConfig?.webhookUrl;
+      if (!webhookUrl) {
+        return res.status(400).json({ error: 'Alamat Webhook URL belum diisi' });
+      }
+
+      let sentCount = 0;
+      let failedCount = 0;
+
+      for (const rec of store.attendance) {
+        try {
+          const participant = INITIAL_PARTICIPANTS.find((p) => p.id === rec.participantId);
+          const session = DIKLAT_SESSIONS.find((s) => s.id === rec.sessionId);
+          const enriched = {
+            ...rec,
+            participantNo: participant?.no || rec.participantId,
+            sessionDate: session?.date || '19 Oktober 2026',
+            sessionCode: session?.code || rec.sessionId,
+            sessionTitle: session?.title || rec.sessionTitle,
+          };
+
+          await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'presensi',
+              data: enriched,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+          sentCount++;
+        } catch {
+          failedCount++;
+        }
+      }
+
+      res.json({
+        success: true,
+        sentCount,
+        failedCount,
+        total: store.attendance.length,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

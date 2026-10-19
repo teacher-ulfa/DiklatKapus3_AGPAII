@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Participant, AttendanceRecord, TaskSubmission } from '../types';
+import { Participant, AttendanceRecord, TaskSubmission, ActiveTab } from '../types';
 import { DIKLAT_SESSIONS, DIKLAT_TASKS } from '../data/diklatData';
 import { generateRecapCSV, downloadCSV } from '../utils/export';
 import { SpreadsheetConfig } from '../services/googleSheets';
@@ -21,6 +21,7 @@ import {
   AlertCircle,
   ExternalLink,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 
 interface RecapSectionProps {
@@ -31,6 +32,7 @@ interface RecapSectionProps {
   onOpenPrintReport: () => void;
   onOpenSpreadsheetModal: () => void;
   spreadsheetConfig: SpreadsheetConfig | null;
+  onNavigate?: (tab: ActiveTab) => void;
 }
 
 export const RecapSection: React.FC<RecapSectionProps> = ({
@@ -41,6 +43,7 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
   onOpenPrintReport,
   onOpenSpreadsheetModal,
   spreadsheetConfig,
+  onNavigate,
 }) => {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -202,6 +205,39 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
             <span>Cetak Format Laporan Resmi</span>
           </button>
         </div>
+      </div>
+
+      {/* Transparansi Publik Callout Banner: Terbuka untuk Seluruh Peserta */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white rounded-xl p-4 sm:p-5 shadow-sm border border-emerald-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0 mt-0.5">
+            <Users className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="font-bold text-sm sm:text-base text-white">
+                Transparansi Publik: Terbuka untuk Seluruh Peserta Diklat
+              </span>
+              <span className="bg-emerald-400/20 text-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Akses Terbuka & Real-time
+              </span>
+            </div>
+            <p className="text-xs text-emerald-200/90 leading-relaxed max-w-2xl">
+              Halaman rekapitulasi ini <b>dapat dilihat oleh semua {participants.length} peserta diklat secara bebas dan terbuka tanpa perlu login atau memasukkan PIN</b>. Setiap peserta dapat memantau akumulasi kehadiran 10 sesi Zoom, status pengumpulan 8 tagihan tugas praktik, perolehan nilai, serta progres kelayakan sertifikat kelulusan 120 JP secara mandiri dan transparan.
+            </p>
+          </div>
+        </div>
+
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('cek-mandiri')}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-bold rounded-lg transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <Award className="w-4 h-4 text-emerald-900" />
+            <span>Buka Kartu Progres Mandiri</span>
+          </button>
+        )}
       </div>
 
       {/* Google Sheets Connection Banner */}

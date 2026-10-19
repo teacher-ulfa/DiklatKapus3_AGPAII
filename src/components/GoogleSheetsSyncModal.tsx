@@ -15,6 +15,10 @@ import {
   LogOut,
   Send,
   Download,
+  ClipboardCopy,
+  Sparkles,
+  Layers,
+  HelpCircle,
 } from 'lucide-react';
 import {
   SpreadsheetConfig,
@@ -24,8 +28,14 @@ import {
 } from '../services/googleSheets';
 import { googleSignIn, logoutGoogle } from '../services/googleAuth';
 import { Participant, AttendanceRecord, TaskSubmission } from '../types';
-import { postSpreadsheetConfigApi } from '../services/diklatApi';
-import { generateRecapCSV, generateAttendanceCSV, downloadCSV } from '../utils/export';
+import { postSpreadsheetConfigApi, triggerSyncAllToWebhookApi } from '../services/diklatApi';
+import {
+  generateRecapCSV,
+  generateAttendanceCSV,
+  generatePanitiaExactSpreadsheetCSV,
+  generatePanitiaClipboardTSV,
+  downloadCSV,
+} from '../utils/export';
 import { DIKLAT_SESSIONS, DIKLAT_TASKS } from '../data/diklatData';
 
 interface GoogleSheetsSyncModalProps {
@@ -64,13 +74,17 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isCreatingSheet, setIsCreatingSheet] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingWebhook, setIsSyncingWebhook] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [sheetTitleInput, setSheetTitleInput] = useState(
     'Rekap Diklat Kapus Perpustakaan - AGPAII Jatim & UIN SATU'
   );
-  const [activeSubTab, setActiveSubTab] = useState<'oauth' | 'webhook'>('oauth');
+  // Default to copy-tsv for immediate 100% success rate without login hurdles
+  const [activeSubTab, setActiveSubTab] = useState<'copy-tsv' | 'oauth' | 'webhook'>('copy-tsv');
   const [webhookInput, setWebhookInput] = useState(spreadsheetConfig?.webhookUrl || '');
   const [isCopiedScript, setIsCopiedScript] = useState(false);
+  const [isCopiedTSV, setIsCopiedTSV] = useState(false);
+  const [isCopiedTSVHeaders, setIsCopiedTSVHeaders] = useState(false);
 
   // Confirmation modal state for destructive sync
   const [showSyncConfirm, setShowSyncConfirm] = useState(false);
@@ -153,7 +167,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   };
 
   // Connect Existing Spreadsheet
-  const handleConnectExisting = () => {
+  const handleConnectExisting = async () => {
     const sheetId = extractSpreadsheetId(manualInput);
     if (!sheetId) {
       onShowToast('Masukkan ID atau Tautan Google Spreadsheet yang valid');
@@ -172,7 +186,18 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     saveSpreadsheetConfig(newConfig);
     onUpdateConfig(newConfig);
     postSpreadsheetConfigApi(newConfig);
-    onShowToast('Google Spreadsheet berhasil dihubungkan.');
+
+    // If logged in with Google, perform immediate sync to user's existing spreadsheet
+    if (accessToken) {
+      try {
+        await syncAllDataToGoogleSheet(accessToken, sheetId, participants, attendance, submissions);
+        onShowToast('Berhasil terhubung & data disinkronkan ke Google Spreadsheet Anda!');
+      } catch {
+        onShowToast('Spreadsheet terhubung. Silakan klik tombol "Sinkronkan Sekarang".');
+      }
+    } else {
+      onShowToast('Google Spreadsheet berhasil dihubungkan ke sistem portal diklat.');
+    }
     setManualInput('');
   };
 
@@ -232,25 +257,108 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     }
   };
 
-  // Copy sample script for Apps Script
-  const sampleAppsScript = `// Kode Google Apps Script (Ekstensi > Apps Script di Spreadsheet Anda)
+  // Batch Push All Records to Apps Script Webhook
+  const handleBatchPushWebhook = async () => {
+    const url = webhookInput.trim() || spreadsheetConfig?.webhookUrl;
+    if (!url) {
+      onShowToast('Masukkan URL Webhook Google Apps Script terlebih dahulu');
+      return;
+    }
+
+    setIsSyncingWebhook(true);
+    try {
+      const res = await triggerSyncAllToWebhookApi(url);
+      if (res && res.success) {
+        onShowToast(
+          `Sukses! ${res.sentCount} data presensi berhasil dikirim ke Google Sheets via Webhook.`
+        );
+      } else {
+        onShowToast('Gagal mengirim ke Webhook. Pastikan URL Apps Script benar dan di-deploy sebagai Web App (Anyone).');
+      }
+    } catch (err: any) {
+      onShowToast(err.message || 'Gagal mengirim data ke Webhook');
+    } finally {
+      setIsSyncingWebhook(false);
+    }
+  };
+
+  // Copy 10-column data directly to clipboard (TSV format for Ctrl+V)
+  const handleCopyPanitiaTSV = (withHeaders: boolean = false) => {
+    let tsv = '';
+    if (withHeaders) {
+      const headers = [
+        'Time stemp',
+        'Tanggal',
+        'No Pesesrta',
+        'Nama',
+        'Instansi',
+        'Kab/Ko',
+        'Sesi-1',
+        'Materi',
+        'Kehadiran',
+        'Catatan',
+      ].join('\t');
+      tsv = headers + '\n' + generatePanitiaClipboardTSV(participants, DIKLAT_SESSIONS, attendance);
+      setIsCopiedTSVHeaders(true);
+      setTimeout(() => setIsCopiedTSVHeaders(false), 3000);
+      onShowToast(
+        `${attendance.length} Baris Data + Judul Kolom tersalin! Tempelkan (Ctrl+V) mulai sel A1 di spreadsheet Anda.`
+      );
+    } else {
+      tsv = generatePanitiaClipboardTSV(participants, DIKLAT_SESSIONS, attendance);
+      setIsCopiedTSV(true);
+      setTimeout(() => setIsCopiedTSV(false), 3000);
+      onShowToast(
+        `${attendance.length} Baris Data tersalin! Tempelkan (Ctrl+V) mulai sel A2 di spreadsheet Anda.`
+      );
+    }
+    navigator.clipboard.writeText(tsv);
+  };
+
+  // Download Exact 10-Column Panitia CSV
+  const handleDownloadPanitiaCSV = () => {
+    const csv = generatePanitiaExactSpreadsheetCSV(participants, DIKLAT_SESSIONS, attendance, ',');
+    downloadCSV(
+      csv,
+      `Presensi_Panitia_10Kolom_${participants.length}Peserta_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    onShowToast(`Berkas CSV 10 Kolom Resmi (${attendance.length} baris) berhasil diunduh`);
+  };
+
+  // Copy sample script for Apps Script (Matching Panitia 10 Columns)
+  const sampleAppsScript = `// Kode Google Apps Script Presensi (Ekstensi > Apps Script di Spreadsheet Anda)
 function doPost(e) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet();
     var contents = JSON.parse(e.postData.contents);
-    var type = contents.type; // 'presensi' atau 'tugas'
-    var data = contents.data;
+    var type = contents.type || 'presensi';
+    var data = contents.data || contents;
+
+    // Prioritaskan sheet pertama atau sheet aktif
+    var targetSheet = sheet.getSheetByName('Presensi Diklat') || sheet.getActiveSheet() || sheet.getSheets()[0];
 
     if (type === 'presensi') {
-      var targetSheet = sheet.getSheetByName('Presensi Diklat') || sheet.insertSheet('Presensi Diklat');
+      // 10 Kolom Panitia:
+      // Time stemp, Tanggal, No Pesesrta, Nama, Instansi, Kab/Ko, Sesi-1, Materi, Kehadiran, Catatan
+      var now = new Date();
+      var timeStampStr = Utilities.formatDate(now, "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
+      var tanggalStr = data.sessionDate || Utilities.formatDate(now, "Asia/Jakarta", "dd MMMM yyyy");
+
       targetSheet.appendRow([
-        new Date(), data.timestamp, data.participantId, data.participantName,
-        data.institution, data.city, data.sessionId, data.sessionTitle,
-        data.status, data.notes || '-'
+        timeStampStr,                              // 1. Time stemp
+        tanggalStr,                                // 2. Tanggal
+        data.participantNo || data.participantId,  // 3. No Pesesrta
+        data.participantName,                      // 4. Nama
+        data.institution,                          // 5. Instansi
+        data.city,                                 // 6. Kab/Ko
+        data.sessionCode || data.sessionId,        // 7. Sesi-1
+        data.sessionTitle,                         // 8. Materi
+        data.status || "Hadir",                    // 9. Kehadiran
+        data.notes || "-"                          // 10. Catatan
       ]);
     } else if (type === 'tugas') {
-      var targetSheet = sheet.getSheetByName('Pengumpulan Tugas') || sheet.insertSheet('Pengumpulan Tugas');
-      targetSheet.appendRow([
+      var tugasSheet = sheet.getSheetByName('Pengumpulan Tugas') || sheet.insertSheet('Pengumpulan Tugas');
+      tugasSheet.appendRow([
         new Date(), data.submittedAt, data.participantId, data.participantName,
         data.institution, data.taskId, data.taskTitle, data.title,
         data.docLink || data.fileUrl || '-', data.notes || '-'
@@ -270,17 +378,17 @@ function doPost(e) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
               <FileSpreadsheet className="w-6 h-6 text-emerald-200" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Integrasi Google Sheets Terpadu</h2>
+              <h2 className="text-lg font-bold">Sinkronisasi Google Spreadsheet Diklat</h2>
               <p className="text-xs text-emerald-100">
-                Kirim data presensi dan tugas diklat secara otomatis ke spreadsheet
+                Hubungkan & kirim seluruh {attendance.length} data presensi ke spreadsheet panitia
               </p>
             </div>
           </div>
@@ -293,33 +401,220 @@ function doPost(e) {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-4 text-xs font-semibold text-slate-600">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-2 overflow-x-auto text-xs font-semibold text-slate-600 no-scrollbar">
+          <button
+            onClick={() => setActiveSubTab('copy-tsv')}
+            className={`pb-3 border-b-2 transition flex items-center gap-2 whitespace-nowrap px-2 ${
+              activeSubTab === 'copy-tsv'
+                ? 'border-emerald-600 text-emerald-700 font-bold'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            Salin Cepat / Download (100% Instan)
+          </button>
           <button
             onClick={() => setActiveSubTab('oauth')}
-            className={`pb-3 border-b-2 transition flex items-center gap-2 ${
+            className={`pb-3 border-b-2 transition flex items-center gap-2 whitespace-nowrap px-2 ${
               activeSubTab === 'oauth'
                 ? 'border-emerald-600 text-emerald-700 font-bold'
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            Google Sheets API (Resmi 1-Klik)
+            Google Sheets API (Auto-Sync)
           </button>
           <button
             onClick={() => setActiveSubTab('webhook')}
-            className={`pb-3 border-b-2 transition flex items-center gap-2 ${
+            className={`pb-3 border-b-2 transition flex items-center gap-2 whitespace-nowrap px-2 ${
               activeSubTab === 'webhook'
                 ? 'border-emerald-600 text-emerald-700 font-bold'
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
             <Code2 className="w-4 h-4" />
-            Google Apps Script Webhook (Opsional)
+            Apps Script Webhook (Kirim Otomatis)
           </button>
         </div>
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-6">
+          {/* TAB 1: Salin Cepat / Unduh Excel (100% Anti-Gagal) */}
+          {activeSubTab === 'copy-tsv' && (
+            <div className="space-y-5">
+              {/* Highlight Hero Card */}
+              <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 text-white rounded-xl p-5 border border-emerald-800 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                    Solusi Paling Cepat &amp; Praktis
+                  </span>
+                  <span className="text-xs text-emerald-200">Tidak perlu izin Google Cloud</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  Sudah Punya File Google Spreadsheet? Salin &amp; Tempel dalam 3 Detik!
+                </h3>
+                <p className="text-xs text-emerald-100/90 leading-relaxed">
+                  Semua <b>{attendance.length} data presensi</b> (Sesi 1 &amp; Sesi 2 untuk seluruh {participants.length} peserta) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
+                </p>
+
+                <div className="pt-2 flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPanitiaTSV(false)}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-xs font-black rounded-lg transition shadow-md flex items-center gap-2"
+                  >
+                    {isCopiedTSV ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-950" />
+                        <span>Tersalin! Siap Ctrl+V di Sel A2</span>
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardCopy className="w-4 h-4" />
+                        <span>Salin Baris Data Saja (Mulai Sel A2)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPanitiaTSV(true)}
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold rounded-lg transition flex items-center gap-2"
+                  >
+                    {isCopiedTSVHeaders ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-300" />
+                        <span>Tersalin Lengkap Judul!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-emerald-300" />
+                        <span>Salin + Judul Kolom (Mulai Sel A1)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadPanitiaCSV}
+                    className="px-3.5 py-2.5 bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                  >
+                    <Download className="w-4 h-4 text-emerald-700" />
+                    <span>Unduh CSV Format 10 Kolom</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3 Simple Steps */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-emerald-700" />
+                  3 Langkah Mudah Memasukkan ke Google Sheets:
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center justify-center text-[11px] mb-1.5">
+                      1
+                    </span>
+                    <p className="font-semibold text-slate-800">Salin Data</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Klik tombol hijau di atas: <b>"Salin Baris Data Saja"</b>.
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center justify-center text-[11px] mb-1.5">
+                      2
+                    </span>
+                    <p className="font-semibold text-slate-800">Buka Spreadsheet</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Buka file Google Sheets Anda di tab baru &amp; klik pada sel <b>A2</b>.
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center justify-center text-[11px] mb-1.5">
+                      3
+                    </span>
+                    <p className="font-semibold text-slate-800">Tekan Ctrl + V</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Tekan <b>Ctrl+V</b> (Paste). Semua 10 kolom otomatis terisi rapi seketika!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview 10 Kolom Panitia */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">
+                    Struktur 10 Kolom Panitia (Pratinjau Data Presensi):
+                  </span>
+                  <span className="text-slate-500 font-mono text-[11px]">
+                    Total {attendance.length} Baris
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-48 text-[11px]">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 text-slate-700 border-b border-slate-200 text-[10px] uppercase font-bold sticky top-0">
+                      <tr>
+                        <th className="p-2 border-r border-slate-200">1. Time stemp</th>
+                        <th className="p-2 border-r border-slate-200">2. Tanggal</th>
+                        <th className="p-2 border-r border-slate-200">3. No Peserta</th>
+                        <th className="p-2 border-r border-slate-200">4. Nama</th>
+                        <th className="p-2 border-r border-slate-200">5. Instansi</th>
+                        <th className="p-2 border-r border-slate-200">6. Kab/Ko</th>
+                        <th className="p-2 border-r border-slate-200">7. Sesi</th>
+                        <th className="p-2 border-r border-slate-200">8. Materi</th>
+                        <th className="p-2 border-r border-slate-200">9. Kehadiran</th>
+                        <th className="p-2">10. Catatan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-[10px]">
+                      {attendance.slice(0, 4).map((rec, i) => {
+                        const p = participants.find((x) => x.id === rec.participantId);
+                        const s = DIKLAT_SESSIONS.find((x) => x.id === rec.sessionId);
+                        return (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="p-1.5 border-r border-slate-200 text-slate-500 whitespace-nowrap">
+                              {rec.timestamp}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 text-slate-600 whitespace-nowrap">
+                              {s?.date || '19 Oktober 2026'}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 text-center font-bold">
+                              {p?.no || rec.participantId}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 font-sans font-medium text-slate-800 whitespace-nowrap">
+                              {rec.participantName}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 font-sans text-slate-600 whitespace-nowrap">
+                              {rec.institution}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 font-sans text-slate-600 whitespace-nowrap">
+                              {rec.city}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 text-center text-emerald-700 font-bold">
+                              {s?.code || rec.sessionId}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 font-sans text-slate-600 truncate max-w-[120px]">
+                              {rec.sessionTitle}
+                            </td>
+                            <td className="p-1.5 border-r border-slate-200 text-center text-emerald-800 font-bold">
+                              {rec.status}
+                            </td>
+                            <td className="p-1.5 font-sans text-slate-500 truncate max-w-[100px]">
+                              {rec.notes || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: Google Sheets API (OAuth) */}
           {activeSubTab === 'oauth' && (
             <>
               {/* Account Status */}
@@ -353,10 +648,10 @@ function doPost(e) {
                   ) : (
                     <div>
                       <p className="text-sm font-semibold text-slate-800">
-                        Belum Terhubung ke Akun Google
+                        Belum Masuk dengan Akun Google
                       </p>
                       <p className="text-xs text-slate-500">
-                        Masuk untuk membuat atau memperbarui spreadsheet di Google Drive Anda
+                        Masuk untuk membuat atau menyinkronkan langsung ke Google Sheets Anda
                       </p>
                     </div>
                   )}
@@ -401,12 +696,12 @@ function doPost(e) {
               </div>
 
               {/* Connected Spreadsheet Box */}
-              {spreadsheetConfig ? (
+              {spreadsheetConfig && spreadsheetConfig.spreadsheetId !== 'webhook-only' ? (
                 <div className="border border-emerald-300 bg-emerald-50/70 rounded-xl p-5 space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="text-[11px] font-bold tracking-wide uppercase px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-800">
-                        Spreadsheet Aktif
+                        Spreadsheet Terhubung
                       </span>
                       <h3 className="text-base font-bold text-slate-900 mt-1">
                         {spreadsheetConfig.spreadsheetTitle}
@@ -415,14 +710,16 @@ function doPost(e) {
                         ID: {spreadsheetConfig.spreadsheetId}
                       </p>
                     </div>
-                    <a
-                      href={spreadsheetConfig.spreadsheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white rounded-lg text-xs font-semibold hover:bg-emerald-800 transition shadow-sm"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Buka Google Sheets
-                    </a>
+                    {spreadsheetConfig.spreadsheetUrl && spreadsheetConfig.spreadsheetUrl !== '#' && (
+                      <a
+                        href={spreadsheetConfig.spreadsheetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white rounded-lg text-xs font-semibold hover:bg-emerald-800 transition shadow-sm"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Buka Google Sheets
+                      </a>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white p-3 rounded-lg border border-emerald-200">
@@ -449,6 +746,7 @@ function doPost(e) {
                           const updated = { ...spreadsheetConfig, autoSync: e.target.checked };
                           saveSpreadsheetConfig(updated);
                           onUpdateConfig(updated);
+                          postSpreadsheetConfigApi(updated);
                           onShowToast(
                             e.target.checked
                               ? 'Sinkronisasi otomatis diaktifkan'
@@ -457,7 +755,7 @@ function doPost(e) {
                         }}
                         className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                       />
-                      <span>Kirim otomatis setiap ada presensi/tugas baru (Realtime)</span>
+                      <span>Kirim otomatis setiap ada presensi/tugas baru</span>
                     </label>
 
                     <div className="flex items-center gap-2">
@@ -469,55 +767,54 @@ function doPost(e) {
                         <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                         {isSyncing ? 'Mengirim...' : 'Sinkronkan Semua Sekarang'}
                       </button>
-                      {isAdminMode && (
-                        <button
-                          onClick={handleDisconnect}
-                          className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-rose-600 font-semibold"
-                        >
-                          Lepas Tautan
-                        </button>
-                      )}
+                      <button
+                        onClick={handleDisconnect}
+                        className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-rose-600 font-semibold"
+                      >
+                        Lepas Tautan
+                      </button>
                     </div>
                   </div>
                 </div>
-              ) : !isAdminMode ? (
-                /* Participant notice when spreadsheet is not yet configured */
-                <div className="border border-slate-200 bg-slate-50 rounded-xl p-5 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-                    <FileSpreadsheet className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Pengaturan Spreadsheet Dikelola Oleh Panitia
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                      Pengaturan koneksi Google Sheets dan pembuatan lembar kerja Drive hanya dapat dilakukan oleh Panitia / Instruktur Diklat.
-                    </p>
-                  </div>
-                  {onRequestAdmin && (
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onRequestAdmin();
-                      }}
-                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition shadow-sm inline-flex items-center gap-1.5"
-                    >
-                      Buka Akses Panitia (PIN)
-                    </button>
-                  )}
-                </div>
               ) : (
-                /* Setup Options when not yet connected (Admin Mode) */
+                /* Connect / Setup Options */
                 <div className="space-y-4">
-                  {/* Option A: Create New Spreadsheet (Recommended) */}
+                  {/* Option 1: Connect Existing Spreadsheet */}
+                  <div className="border border-slate-200 rounded-xl p-5 hover:border-emerald-300 transition bg-white shadow-sm">
+                    <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                      <LinkIcon className="w-4 h-4 text-emerald-600" />
+                      <span>Hubungkan Spreadsheet Panitia yang Sudah Ada</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Tempelkan URL lengkap Google Spreadsheet Anda atau Spreadsheet ID di kolom bawah.
+                    </p>
+
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={manualInput}
+                        onChange={(e) => setManualInput(e.target.value)}
+                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs.../edit"
+                        className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                      />
+                      <button
+                        onClick={handleConnectExisting}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition whitespace-nowrap shadow-sm"
+                      >
+                        Hubungkan Spreadsheet
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Create New Spreadsheet */}
                   <div className="border border-slate-200 rounded-xl p-5 hover:border-emerald-300 transition bg-white shadow-sm">
                     <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
                       <PlusCircle className="w-4 h-4" />
-                      <span>Pilihan 1: Buat Spreadsheet Baru di Google Drive (Rekomendasi)</span>
+                      <span>Atau Buat File Spreadsheet Baru di Google Drive</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
                       Sistem akan membuat file spreadsheet baru dengan struktur 3 tab lengkap:
-                      Presensi, Pengumpulan Tugas, dan Rekapitulasi Nilai ({participants.length} Peserta).
+                      Presensi Diklat, Pengumpulan Tugas, dan Rekapitulasi Nilai ({participants.length} Peserta).
                     </p>
 
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -543,49 +840,21 @@ function doPost(e) {
                       </p>
                     )}
                   </div>
-
-                  {/* Option B: Connect Existing Spreadsheet */}
-                  <div className="border border-slate-200 rounded-xl p-5 hover:border-emerald-300 transition bg-white shadow-sm">
-                    <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                      <LinkIcon className="w-4 h-4 text-slate-500" />
-                      <span>Pilihan 2: Hubungkan Spreadsheet yang Sudah Ada</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Tempelkan URL lengkap Google Spreadsheet atau Spreadsheet ID panitia.
-                    </p>
-
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        value={manualInput}
-                        onChange={(e) => setManualInput(e.target.value)}
-                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs.../edit"
-                        className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
-                      />
-                      <button
-                        onClick={handleConnectExisting}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition whitespace-nowrap"
-                      >
-                        Hubungkan ID
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
             </>
           )}
 
+          {/* TAB 3: Webhook */}
           {activeSubTab === 'webhook' && (
             <div className="space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
                 <p className="font-semibold flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-amber-600" />
-                  Kirim Data Tanpa Login Peserta (Google Apps Script Webhook)
+                  Kirim Data Tanpa Login Google (Google Apps Script Webhook)
                 </p>
                 <p className="mt-1 text-slate-600">
-                  Jika Anda ingin data presensi dan tugas dikirim langsung dari perangkat HP peserta
-                  tanpa mengharuskan setiap peserta login akun Google, Anda dapat memasang Apps
-                  Script di Spreadsheet Anda dan menempelkan Web App URL di bawah.
+                  Dengan memasang Apps Script di Spreadsheet Anda, data presensi dikirim langsung dari server ke spreadsheet Anda tanpa perlu otorisasi Google OAuth.
                 </p>
               </div>
 
@@ -593,7 +862,7 @@ function doPost(e) {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Google Apps Script Web App URL:
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="url"
                     value={webhookInput}
@@ -601,12 +870,22 @@ function doPost(e) {
                     placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
                     className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
-                  <button
-                    onClick={handleSaveWebhook}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold whitespace-nowrap"
-                  >
-                    Simpan Webhook
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveWebhook}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold whitespace-nowrap"
+                    >
+                      Simpan URL
+                    </button>
+                    <button
+                      onClick={handleBatchPushWebhook}
+                      disabled={isSyncingWebhook || !webhookInput.trim()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingWebhook ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingWebhook ? 'Mengirim...' : 'Kirim Semua Sekarang'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -642,42 +921,62 @@ function doPost(e) {
             </div>
           )}
 
-          {/* Direct CSV Export Section (Works Instantly without setup) */}
-          <div className="mt-5 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          {/* Quick CSV Export Bar */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-bold text-xs text-slate-800 block">
-                  Ekspor Cepat Berkas Spreadsheet (.CSV)
+                  Unduh Berkas Excel / CSV Langsung
                 </span>
                 <p className="text-[11px] text-slate-500">
-                  Dapat langsung dibuka di Microsoft Excel atau diimpor ke Google Sheets Drive Anda dalam 3 detik.
+                  Dapat langsung dibuka di Excel atau diimpor ke Google Sheets melalui menu File &gt; Import.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  const csv = generateAttendanceCSV(participants, DIKLAT_SESSIONS, attendance);
-                  downloadCSV(csv, `Presensi_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
-                  onShowToast('Berkas CSV Presensi 52 peserta berhasil diunduh');
-                }}
+                onClick={handleDownloadPanitiaCSV}
                 className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Unduh CSV Presensi (52 Peserta)</span>
+                <span>Unduh CSV Format 10 Kolom Panitia</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const csv = generateRecapCSV(participants, DIKLAT_SESSIONS, DIKLAT_TASKS, attendance, submissions);
-                  downloadCSV(csv, `Rekap_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
-                  onShowToast('Berkas CSV Rekapitulasi Lengkap 52 peserta berhasil diunduh');
+                  const csv = generateAttendanceCSV(participants, DIKLAT_SESSIONS, attendance);
+                  downloadCSV(
+                    csv,
+                    `Presensi_Diklat_${participants.length}Peserta_${new Date().toISOString().slice(0, 10)}.csv`
+                  );
+                  onShowToast(`Berkas CSV Presensi ${participants.length} peserta berhasil diunduh`);
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>Unduh CSV Rekap Presensi Sesi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const csv = generateRecapCSV(
+                    participants,
+                    DIKLAT_SESSIONS,
+                    DIKLAT_TASKS,
+                    attendance,
+                    submissions
+                  );
+                  downloadCSV(
+                    csv,
+                    `Rekap_Diklat_${participants.length}Peserta_${new Date().toISOString().slice(0, 10)}.csv`
+                  );
+                  onShowToast(`Berkas CSV Rekapitulasi Lengkap ${participants.length} peserta berhasil diunduh`);
                 }}
                 className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition shadow-xs"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-200" />
-                <span>Unduh CSV Rekapitulasi Lengkap</span>
+                <span>Unduh CSV Rekap Portofolio Nilai</span>
               </button>
             </div>
           </div>
@@ -686,8 +985,8 @@ function doPost(e) {
         {/* Modal Footer */}
         <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between">
           <p className="text-xs text-slate-500">
-            {spreadsheetConfig
-              ? `Status: Terhubung ke spreadsheet (${spreadsheetConfig.spreadsheetTitle})`
+            {spreadsheetConfig && spreadsheetConfig.spreadsheetUrl !== '#'
+              ? `Status: Terhubung (${spreadsheetConfig.spreadsheetTitle})`
               : 'Status: Belum terhubung ke spreadsheet'}
           </p>
           <button
@@ -699,7 +998,7 @@ function doPost(e) {
         </div>
       </div>
 
-      {/* Confirmation Dialog for Destructive / Mutating Operation (MANDATORY per Workspace Integration Skill) */}
+      {/* Confirmation Dialog for Destructive / Mutating Operation */}
       {showSyncConfirm && (
         <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">

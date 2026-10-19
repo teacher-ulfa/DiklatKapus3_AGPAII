@@ -17,7 +17,7 @@ export const fetchRemoteDiklatData = async (): Promise<RemoteDiklatData | null> 
       attendance: data.attendance || [],
       submissions: data.submissions || [],
       spreadsheetConfig: data.spreadsheetConfig || null,
-      totalParticipants: data.totalParticipants || 52,
+      totalParticipants: data.totalParticipants || 54,
     };
   } catch (err) {
     console.warn('API /api/data not reachable (using local fallback):', err);
@@ -131,6 +131,23 @@ export const triggerMassAttendanceSessionApi = async (
     return await res.json();
   } catch (err) {
     console.warn('triggerMassAttendanceSessionApi error:', err);
+    return null;
+  }
+};
+
+export const triggerSyncAllToWebhookApi = async (
+  webhookUrl?: string
+): Promise<{ success: boolean; sentCount: number; failedCount: number; total: number } | null> => {
+  try {
+    const res = await fetch('/api/webhook/sync-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('triggerSyncAllToWebhookApi error:', err);
     return null;
   }
 };

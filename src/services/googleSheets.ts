@@ -106,9 +106,77 @@ export const createDiklatSpreadsheet = async (
 };
 
 /**
+ * Safely discover sheets in spreadsheet and create missing tabs if needed
+ */
+export const ensureWorkbookSheets = async (
+  accessToken: string,
+  spreadsheetId: string
+): Promise<{ sheetTitles: string[]; firstSheetTitle: string }> => {
+  const metaRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!metaRes.ok) {
+    const err = await metaRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Gagal membaca informasi spreadsheet Google Drive');
+  }
+
+  const meta = await metaRes.json();
+  const sheetTitles: string[] = meta.sheets?.map((s: any) => s.properties?.title) || [];
+  const firstSheetTitle = sheetTitles[0] || 'Sheet1';
+
+  // Check if standard tabs are missing and add them if needed
+  const requiredTabs = ['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'];
+  const missingTabs = requiredTabs.filter((t) => !sheetTitles.includes(t));
+
+  if (missingTabs.length > 0) {
+    const requests = missingTabs.map((t) => ({
+      addSheet: {
+        properties: {
+          title: t,
+        },
+      },
+    }));
+
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requests }),
+      }
+    ).catch(() => {});
+  }
+
+  return { sheetTitles: [...sheetTitles, ...missingTabs], firstSheetTitle };
+};
+
+/**
  * Initializes header columns on all sheets
  */
 export const initializeSheetHeaders = async (accessToken: string, spreadsheetId: string) => {
+  const { sheetTitles, firstSheetTitle } = await ensureWorkbookSheets(accessToken, spreadsheetId);
+
+  // Exact 10-column headers requested by Panitia
+  const panitia10Headers = [
+    'Time stemp',
+    'Tanggal',
+    'No Pesesrta',
+    'Nama',
+    'Instansi',
+    'Kab/Ko',
+    'Sesi-1',
+    'Materi',
+    'Kehadiran',
+    'Catatan',
+  ];
+
   const presensiHeaders = [
     'No',
     'Waktu Presensi',
@@ -157,35 +225,51 @@ export const initializeSheetHeaders = async (accessToken: string, spreadsheetId:
     'Status Kelulusan Diklat 120 JP',
   ];
 
-  const data = [
-    {
+  const data: any[] = [];
+
+  // If first sheet is not one of the 3 tabs (e.g. Sheet1, Form Responses), prepare Panitia 10-column header
+  if (firstSheetTitle && !['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'].includes(firstSheetTitle)) {
+    data.push({
+      range: `'${firstSheetTitle}'!A1:J1`,
+      values: [panitia10Headers],
+    });
+  }
+
+  if (sheetTitles.includes('Presensi Diklat')) {
+    data.push({
       range: "'Presensi Diklat'!A1:M1",
       values: [presensiHeaders],
-    },
-    {
+    });
+  }
+  if (sheetTitles.includes('Pengumpulan Tugas')) {
+    data.push({
       range: "'Pengumpulan Tugas'!A1:P1",
       values: [tugasHeaders],
-    },
-    {
+    });
+  }
+  if (sheetTitles.includes('Rekapitulasi Nilai Peserta')) {
+    data.push({
       range: "'Rekapitulasi Nilai Peserta'!A1:J1",
       values: [rekapHeaders],
-    },
-  ];
+    });
+  }
 
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        valueInputOption: 'USER_ENTERED',
-        data,
-      }),
-    }
-  );
+  if (data.length > 0) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          valueInputOption: 'USER_ENTERED',
+          data,
+        }),
+      }
+    );
+  }
 };
 
 /**
@@ -197,12 +281,49 @@ export const appendAttendanceToSheet = async (
   record: AttendanceRecord,
   index?: number
 ) => {
+  const { sheetTitles, firstSheetTitle } = await ensureWorkbookSheets(accessToken, spreadsheetId).catch(() => ({
+    sheetTitles: ['Presensi Diklat'],
+    firstSheetTitle: 'Sheet1',
+  }));
+
+  const sessionObj = DIKLAT_SESSIONS.find((s) => s.id === record.sessionId);
+
+  // If Panitia's custom first sheet exists (Sheet1 / Form responses)
+  if (firstSheetTitle && !sheetTitles.includes('Presensi Diklat')) {
+    const panitiaRow = [
+      record.timestamp || new Date().toLocaleString('id-ID'),
+      sessionObj?.date || '19 Oktober 2026',
+      record.participantId,
+      record.participantName,
+      record.institution,
+      record.city,
+      sessionObj?.code || record.sessionId,
+      record.sessionTitle,
+      record.status,
+      record.notes || '-',
+    ];
+
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${firstSheetTitle}'!A:J:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ values: [panitiaRow] }),
+      }
+    );
+    return res.ok;
+  }
+
+  // Standard Presensi Diklat Tab
   const row = [
     index || 1,
     record.timestamp,
     record.participantId,
     record.participantName,
-    '', // Jabatan will be filled if participant is lookuped
+    '',
     record.institution,
     record.city,
     record.sessionId,
@@ -213,8 +334,9 @@ export const appendAttendanceToSheet = async (
     record.photoProof ? 'Ada Foto Bukti Kehadiran' : 'Tidak Ada',
   ];
 
+  const targetSheet = sheetTitles.includes('Presensi Diklat') ? 'Presensi Diklat' : firstSheetTitle;
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Presensi Diklat'!A:M:append?valueInputOption=USER_ENTERED`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${targetSheet}'!A:M:append?valueInputOption=USER_ENTERED`,
     {
       method: 'POST',
       headers: {
@@ -371,22 +493,66 @@ export const syncAllDataToGoogleSheet = async (
     ];
   });
 
-  // Clear existing data rows below header and replace
-  // We use batchUpdate to populate the sheet cleanly
-  const data = [
-    {
+  // 5. Prepare Panitia 10-Column Rows:
+  // Time stemp, Tanggal, No Pesesrta, Nama, Instansi, Kab/Ko, Sesi-1, Materi, Kehadiran, Catatan
+  const panitia10ColRows: (string | number)[][] = [];
+  participants.forEach((p) => {
+    DIKLAT_SESSIONS.forEach((s) => {
+      const att = attendanceList.find(
+        (a) => a.participantId === p.id && a.sessionId === s.id
+      );
+      if (att) {
+        panitia10ColRows.push([
+          att.timestamp || '2026-10-19 08:15:00 WIB',
+          s.date || '19 Oktober 2026',
+          p.no,
+          p.name,
+          p.institution,
+          p.city,
+          s.code,
+          s.title,
+          att.status || 'Hadir',
+          att.notes || 'Hadir Zoom Meeting Diklat',
+        ]);
+      }
+    });
+  });
+
+  const { sheetTitles, firstSheetTitle } = await ensureWorkbookSheets(accessToken, spreadsheetId).catch(() => ({
+    sheetTitles: ['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'],
+    firstSheetTitle: 'Sheet1',
+  }));
+
+  const data: any[] = [];
+
+  // If first sheet is not one of the standard tabs, populate it with Panitia's 10-column format
+  if (firstSheetTitle && !['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'].includes(firstSheetTitle)) {
+    data.push({
+      range: `'${firstSheetTitle}'!A2:J${Math.max(panitia10ColRows.length + 1, 100)}`,
+      values: panitia10ColRows.length > 0 ? panitia10ColRows : [['-']],
+    });
+  }
+
+  if (sheetTitles.includes('Presensi Diklat')) {
+    data.push({
       range: `'Presensi Diklat'!A2:M${Math.max(presensiRows.length + 1, 100)}`,
       values: presensiRows.length > 0 ? presensiRows : [['-']],
-    },
-    {
+    });
+  }
+
+  if (sheetTitles.includes('Pengumpulan Tugas')) {
+    data.push({
       range: `'Pengumpulan Tugas'!A2:P${Math.max(tugasRows.length + 1, 100)}`,
       values: tugasRows.length > 0 ? tugasRows : [['-']],
-    },
-    {
+    });
+  }
+
+  if (sheetTitles.includes('Rekapitulasi Nilai Peserta')) {
+    data.push({
       range: `'Rekapitulasi Nilai Peserta'!A2:J${Math.max(rekapRows.length + 1, 100)}`,
       values: rekapRows,
-    },
-  ];
+    });
+  }
 
   const updateRes = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,

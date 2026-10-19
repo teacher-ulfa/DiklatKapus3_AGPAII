@@ -228,7 +228,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             type="button"
             onClick={() => {
               const csv = generateAttendanceCSV(participants, DIKLAT_SESSIONS, attendance);
-              downloadCSV(csv, `Presensi_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
+              downloadCSV(csv, `Presensi_Diklat_${participants.length}Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
             }}
             className="px-3 py-1.5 bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-bold rounded-lg transition shadow-xs flex items-center gap-1.5"
           >
@@ -248,14 +248,14 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm text-slate-900">
-                  Pemulihan & Presensi Massal Sesi 1 & 2 (52 Peserta)
+                  Pemulihan & Presensi Massal Sesi 1 & 2 ({participants.length} Peserta)
                 </span>
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
                   Aksi Cepat Panitia
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b> dan <b>Sesi 2 (Pengorganisasian Informasi)</b>. Klik tombol di sebelah kanan untuk memastikan seluruh 52 peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
+                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b> dan <b>Sesi 2 (Pengorganisasian Informasi)</b>. Klik tombol di sebelah kanan untuk memastikan seluruh {participants.length} peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
               </p>
             </div>
           </div>
@@ -266,7 +266,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
               className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-lg transition shadow-sm flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Tandai Hadir Semua Sesi 1 & 2 (52 Peserta)</span>
+              <span>Tandai Hadir Semua Sesi 1 & 2 ({participants.length} Peserta)</span>
             </button>
             {onOpenSpreadsheetModal && (
               <button

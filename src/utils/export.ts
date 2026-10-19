@@ -169,3 +169,99 @@ export const generateAttendanceCSV = (
   return [headers.map(escapeCSV).join(';'), ...rows].join('\r\n');
 };
 
+/**
+ * Exact 10-Column Format Matching Panitia's Spreadsheet:
+ * Time stemp, Tanggal, No Pesesrta, Nama, Instansi, Kab/Ko, Sesi-1, Materi, Kehadiran, Catatan
+ */
+export const generatePanitiaExactSpreadsheetCSV = (
+  participants: Participant[],
+  sessions: DiklatSession[],
+  attendanceList: AttendanceRecord[],
+  delimiter: ',' | ';' = ','
+): string => {
+  const headers = [
+    'Time stemp',
+    'Tanggal',
+    'No Pesesrta',
+    'Nama',
+    'Instansi',
+    'Kab/Ko',
+    'Sesi-1',
+    'Materi',
+    'Kehadiran',
+    'Catatan',
+  ];
+
+  const escapeCSV = (val: string | number | undefined | null) => {
+    if (val === undefined || val === null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const rows: string[] = [];
+
+  // Sort attendance chronologically or by participant
+  participants.forEach((p) => {
+    sessions.forEach((s) => {
+      const att = attendanceList.find(
+        (a) => a.participantId === p.id && a.sessionId === s.id
+      );
+      if (att) {
+        rows.push(
+          [
+            att.timestamp || '2026-10-19 08:15:00 WIB',
+            s.date || '19 Oktober 2026',
+            p.no,
+            p.name,
+            p.institution,
+            p.city,
+            s.code,
+            s.title,
+            att.status || 'Hadir',
+            att.notes || 'Hadir Zoom Meeting Diklat',
+          ]
+            .map(escapeCSV)
+            .join(delimiter)
+        );
+      }
+    });
+  });
+
+  return [headers.map(escapeCSV).join(delimiter), ...rows].join('\r\n');
+};
+
+/**
+ * TSV string for copying directly to clipboard (so user can simply Ctrl+V in Google Sheets starting at cell A2)
+ */
+export const generatePanitiaClipboardTSV = (
+  participants: Participant[],
+  sessions: DiklatSession[],
+  attendanceList: AttendanceRecord[]
+): string => {
+  const rows: string[] = [];
+  participants.forEach((p) => {
+    sessions.forEach((s) => {
+      const att = attendanceList.find(
+        (a) => a.participantId === p.id && a.sessionId === s.id
+      );
+      if (att) {
+        rows.push(
+          [
+            att.timestamp || '2026-10-19 08:15:00 WIB',
+            s.date || '19 Oktober 2026',
+            p.no,
+            p.name,
+            p.institution,
+            p.city,
+            s.code,
+            s.title,
+            att.status || 'Hadir',
+            att.notes || 'Hadir Zoom Meeting Diklat',
+          ].join('\t')
+        );
+      }
+    });
+  });
+  return rows.join('\n');
+};
+

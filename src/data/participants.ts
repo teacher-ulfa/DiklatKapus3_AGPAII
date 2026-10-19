@@ -521,5 +521,25 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     city: 'Provinsi Lain / Kab. Natuna',
     province: 'Kepulauan Riau (Ibu Kota Tanjung Pinang)',
   },
+  {
+    id: 53,
+    no: 53,
+    name: 'Lukman Hakim, S.Kom',
+    status: 'Kepala Perpustakaan',
+    kepalaPerpusStatus: 'Belum',
+    institution: 'SMP At-Tholhawiyah',
+    city: 'Kabupaten Bangkalan',
+    province: 'Jawa Timur',
+  },
+  {
+    id: 54,
+    no: 54,
+    name: 'YENELLI, S.Pd.I',
+    status: 'Kepala Perpustakaan',
+    kepalaPerpusStatus: 'Sudah',
+    institution: 'SMA NEGERI 1MIDAI',
+    city: 'Provinsi Lain / Kab. Natuna',
+    province: 'Kepulauan Riau (Provinsi Lain)',
+  },
 ];
 

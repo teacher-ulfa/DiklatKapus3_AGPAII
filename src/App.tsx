@@ -444,6 +444,10 @@ export default function App() {
             onOpenPrintReport={() => setIsPrintReportOpen(true)}
             onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
             spreadsheetConfig={spreadsheetConfig}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
