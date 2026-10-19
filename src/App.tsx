@@ -34,7 +34,7 @@ import {
   syncLocalToServerApi,
   triggerMassAttendanceSessionApi,
 } from './services/diklatApi';
-import { initAuth, logoutGoogle } from './services/googleAuth';
+import { initAuth, logoutGoogle, googleSignIn } from './services/googleAuth';
 import { Header } from './components/Header';
 import { HomeSection } from './components/HomeSection';
 import { AttendanceSection } from './components/AttendanceSection';
@@ -131,17 +131,35 @@ export default function App() {
       (user, token) => {
         setCurrentUser(user);
         setAccessToken(token);
+        if (user.email?.toLowerCase().trim() === 'pembelajaranulfa@gmail.com') {
+          setIsAdminMode(true);
+        }
       },
       () => {
         setCurrentUser(null);
         setAccessToken(null);
+        setIsAdminMode(false);
       }
     );
+
+    // Secret keyboard shortcut (Ctrl+Shift+A) for emergency owner access
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        setIsPinModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    // URL parameter ?owner=true
+    if (typeof window !== 'undefined' && window.location.search.includes('owner=')) {
+      setIsPinModalOpen(true);
+    }
 
     return () => {
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -343,9 +361,9 @@ export default function App() {
               <button
                 onClick={handleRestoreSession1And2}
                 className="hover:underline flex items-center gap-1 font-bold text-emerald-100 bg-emerald-800/80 px-2.5 py-0.5 rounded text-[11px]"
-                title="Tandai Hadir seluruh 52 peserta untuk Sesi 1 & Sesi 2 di server"
+                title="Tandai Hadir seluruh peserta untuk Sesi 1, 2, dan 3 di server"
               >
-                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1 & 2 (52 Peserta)
+                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1, 2 &amp; 3 ({participants.length} Peserta)
               </button>
               <button
                 onClick={handleBackupJSON}
@@ -360,10 +378,18 @@ export default function App() {
                 <RefreshCw className="w-3 h-3" /> Reset Demo
               </button>
               <button
-                onClick={() => setIsAdminMode(false)}
+                onClick={() => {
+                  setIsAdminMode(false);
+                  if (currentUser) {
+                    logoutGoogle().catch(() => {});
+                    setCurrentUser(null);
+                    setAccessToken(null);
+                  }
+                  showToast('Mode Panitia ditutup (Kembali ke Mode Publik Peserta)');
+                }}
                 className="bg-amber-800 px-2 py-0.5 rounded text-[11px] hover:bg-amber-900"
               >
-                Tutup Mode Panitia
+                Keluar Mode Panitia
               </button>
             </div>
           </div>
@@ -378,12 +404,35 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         isAdminMode={isAdminMode}
-        onToggleAdmin={() => {
-          if (isAdminMode) {
+        currentUser={currentUser}
+        onToggleAdmin={async () => {
+          if (isAdminMode || currentUser) {
             setIsAdminMode(false);
-            showToast('Mode Panitia ditutup (Kembali ke Mode Peserta)');
+            if (currentUser) {
+              logoutGoogle().catch(() => {});
+              setCurrentUser(null);
+              setAccessToken(null);
+            }
+            showToast('Berhasil keluar (Mode Publik Peserta)');
           } else {
-            setIsPinModalOpen(true);
+            try {
+              const res = await googleSignIn();
+              if (res) {
+                setCurrentUser(res.user);
+                setAccessToken(res.accessToken);
+                const isOwner = res.user.email?.toLowerCase().trim() === 'pembelajaranulfa@gmail.com';
+                if (isOwner) {
+                  setIsAdminMode(true);
+                  showToast('Selamat Datang Pemilik (pembelajaranulfa@gmail.com)! Akses Panitia Aktif.');
+                } else {
+                  setIsAdminMode(false);
+                  showToast(`Masuk sebagai ${res.user.displayName || res.user.email} (Mode Peserta)`);
+                }
+              }
+            } catch (err: any) {
+              console.warn('Google sign-in fallback:', err);
+              setIsPinModalOpen(true);
+            }
           }
         }}
         onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
@@ -507,13 +556,19 @@ export default function App() {
         onRequestAdmin={() => setIsPinModalOpen(true)}
       />
 
-      {/* Admin PIN Verification Modal */}
+      {/* Admin Verification Modal */}
       <AdminPinModal
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
         onSuccess={() => {
           setIsAdminMode(true);
-          showToast('Mode Panitia & Instruktur Berhasil Dibuka');
+          showToast('Selamat Datang, Mode Pemilik & Panitia (pembelajaranulfa@gmail.com) Terverifikasi');
+        }}
+        onGoogleAuthSuccess={(user, token) => {
+          setCurrentUser(user);
+          setAccessToken(token);
+          setIsAdminMode(true);
+          showToast(`Berhasil masuk sebagai Pemilik (${user.email})`);
         }}
       />
 
@@ -524,7 +579,10 @@ export default function App() {
       />
 
       {/* Footer */}
-      <Footer />
+      <Footer
+        onOpenOwnerLogin={() => setIsPinModalOpen(true)}
+        isAdminMode={isAdminMode}
+      />
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import React from 'react';
 import { ActiveTab } from '../types';
 import { AGPAII_LOGO_URL, UIN_LOGO_URL, DRIVE_MODUL_URL, ZOOM_CONFIG } from '../data/diklatData';
-import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink, FileSpreadsheet, Video } from 'lucide-react';
+import { Shield, Sparkles, UserCheck, FolderOpen, ExternalLink, FileSpreadsheet, Video, Lock } from 'lucide-react';
+import { User } from 'firebase/auth';
 
 interface HeaderProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
   isAdminMode: boolean;
+  currentUser?: User | null;
   onToggleAdmin: () => void;
   onOpenSpreadsheetModal: () => void;
   isSpreadsheetConnected: boolean;
@@ -17,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onTabChange,
   isAdminMode,
+  currentUser,
   onToggleAdmin,
   onOpenSpreadsheetModal,
   isSpreadsheetConnected,
@@ -151,17 +154,73 @@ export const Header: React.FC<HeaderProps> = ({
               <ExternalLink className="w-3 h-3 text-emerald-600" />
             </a>
 
-            <button
-              onClick={onToggleAdmin}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
-                isAdminMode
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
-                  : 'bg-slate-900 hover:bg-slate-800 text-white'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>{isAdminMode ? 'Panitia (Aktif)' : 'Panel Panitia'}</span>
-            </button>
+            {isAdminMode ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-800 text-white text-xs font-semibold shadow-sm border border-emerald-700">
+                {currentUser?.photoURL ? (
+                  <img
+                    src={currentUser.photoURL}
+                    alt="Foto Profil"
+                    className="w-4 h-4 rounded-full border border-emerald-300"
+                  />
+                ) : (
+                  <Shield className="w-3.5 h-3.5 text-emerald-300" />
+                )}
+                <span className="hidden sm:inline font-bold">Pemilik Aktif</span>
+                <button
+                  onClick={onToggleAdmin}
+                  className="ml-1 text-[10px] bg-emerald-950/80 hover:bg-emerald-950 px-1.5 py-0.5 rounded text-emerald-200 font-bold"
+                  title="Keluar dari Mode Pemilik"
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : currentUser ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs">
+                {currentUser.photoURL && (
+                  <img
+                    src={currentUser.photoURL}
+                    alt="Foto Profil"
+                    className="w-4 h-4 rounded-full"
+                  />
+                )}
+                <span className="truncate max-w-[90px] text-[11px] hidden sm:inline">
+                  {currentUser.displayName || currentUser.email}
+                </span>
+                <button
+                  onClick={onToggleAdmin}
+                  className="text-[10px] text-slate-500 hover:text-slate-800 ml-1"
+                  title="Keluar"
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onToggleAdmin}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition shadow-2xs"
+                title="Masuk Akun Google"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1s.7 5.4 1.9 7.8l3.7-2.9z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.9C3.7 20.6 7.5 23.5 12 23.5z"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Masuk</span>
+              </button>
+            )}
           </div>
         </div>
 

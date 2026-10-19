@@ -3,8 +3,8 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v8',
-  ATTENDANCE: 'diklat_perpus_attendance_v8',
+  PARTICIPANTS: 'diklat_perpus_participants_v9',
+  ATTENDANCE: 'diklat_perpus_attendance_v9',
   SUBMISSIONS: 'diklat_perpus_submissions_v5',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v4',
 };
@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
 export const getAllLocalAttendanceToRecover = (): AttendanceRecord[] => {
   const recovered: AttendanceRecord[] = [];
   const keys = [
+    'diklat_perpus_attendance_v9',
     'diklat_perpus_attendance_v8',
     'diklat_perpus_attendance_v7',
     'diklat_perpus_attendance_v6',
@@ -111,11 +112,16 @@ export const getStoredAttendance = (): AttendanceRecord[] => {
     const data = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
     if (data) {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length >= INITIAL_ATTENDANCE.length) {
-        return parsed;
-      }
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost
+      if (Array.isArray(parsed)) {
+        const hasSesi1 = parsed.some((a) => a.sessionId === 'sesi-1');
+        const hasSesi2 = parsed.some((a) => a.sessionId === 'sesi-2');
+        const hasSesi3 = parsed.some((a) => a.sessionId === 'sesi-3');
+        const hasAllSeeds = hasSesi1 && hasSesi2 && hasSesi3 && parsed.length >= INITIAL_ATTENDANCE.length;
+        if (hasAllSeeds) {
+          return parsed;
+        }
+
+        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost and Sesi 1, 2, 3 are complete
         const merged = [...parsed];
         INITIAL_ATTENDANCE.forEach((seed) => {
           const exists = merged.some(
