@@ -3,31 +3,81 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v5',
-  ATTENDANCE: 'diklat_perpus_attendance_v4',
-  SUBMISSIONS: 'diklat_perpus_submissions_v4',
+  PARTICIPANTS: 'diklat_perpus_participants_v6',
+  ATTENDANCE: 'diklat_perpus_attendance_v5',
+  SUBMISSIONS: 'diklat_perpus_submissions_v5',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v4',
 };
 
-// Clean up legacy demo keys so the app starts completely clean for live production with real participants
-try {
-  [
-    'diklat_perpus_attendance',
-    'diklat_perpus_attendance_v2',
+// Collector to recover any attendance filled on this device from previous keys
+export const getAllLocalAttendanceToRecover = (): AttendanceRecord[] => {
+  const recovered: AttendanceRecord[] = [];
+  const keys = [
+    'diklat_perpus_attendance_v5',
+    'diklat_perpus_attendance_v4',
     'diklat_perpus_attendance_v3',
-    'diklat_perpus_submissions',
-    'diklat_perpus_submissions_v2',
+    'diklat_perpus_attendance_v2',
+    'diklat_perpus_attendance',
+  ];
+
+  keys.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach((rec) => {
+            if (rec && rec.participantId && rec.sessionId) {
+              const already = recovered.some(
+                (r) => r.participantId === rec.participantId && r.sessionId === rec.sessionId
+              );
+              if (!already) recovered.push(rec);
+            }
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  });
+
+  return recovered;
+};
+
+// Collector to recover any submissions made on this device from previous keys
+export const getAllLocalSubmissionsToRecover = (): TaskSubmission[] => {
+  const recovered: TaskSubmission[] = [];
+  const keys = [
+    'diklat_perpus_submissions_v5',
+    'diklat_perpus_submissions_v4',
     'diklat_perpus_submissions_v3',
-    'diklat_perpus_participants_v2',
-    'diklat_perpus_participants_v3',
-    'diklat_perpus_participants_v4',
-    'diklat_perpus_admin_mode',
-    'diklat_perpus_admin_mode_v2',
-    'diklat_perpus_admin_mode_v3',
-  ].forEach((key) => localStorage.removeItem(key));
-} catch {
-  // ignore
-}
+    'diklat_perpus_submissions_v2',
+    'diklat_perpus_submissions',
+  ];
+
+  keys.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach((sub) => {
+            if (sub && sub.participantId && sub.taskId) {
+              const already = recovered.some(
+                (s) => s.participantId === sub.participantId && s.taskId === sub.taskId
+              );
+              if (!already) recovered.push(sub);
+            }
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  });
+
+  return recovered;
+};
 
 export const getStoredParticipants = (): Participant[] => {
   try {

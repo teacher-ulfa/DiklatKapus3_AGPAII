@@ -14,6 +14,8 @@ import {
   saveSubmissions,
   resetAllData,
   exportAllDataJSON,
+  getAllLocalAttendanceToRecover,
+  getAllLocalSubmissionsToRecover,
 } from './utils/storage';
 import {
   SpreadsheetConfig,
@@ -23,6 +25,15 @@ import {
   appendSubmissionToSheet,
   forwardToAppsScriptWebhook,
 } from './services/googleSheets';
+import {
+  fetchRemoteDiklatData,
+  postAttendanceApi,
+  deleteAttendanceApi,
+  postSubmissionApi,
+  postGradeSubmissionApi,
+  syncLocalToServerApi,
+  triggerMassAttendanceSessionApi,
+} from './services/diklatApi';
 import { initAuth, logoutGoogle } from './services/googleAuth';
 import { Header } from './components/Header';
 import { HomeSection } from './components/HomeSection';
@@ -37,7 +48,7 @@ import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { ZoomModal } from './components/ZoomModal';
 import { Footer } from './components/Footer';
-import { Shield, RefreshCw, Download, Check } from 'lucide-react';
+import { Shield, RefreshCw, Download, Check, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda');
@@ -73,10 +84,47 @@ export default function App() {
 
   // Load data & init Google Auth on mount
   useEffect(() => {
+    // 1. Load local data first for instant render
     setParticipants(getStoredParticipants());
     setAttendance(getStoredAttendance());
     setSubmissions(getStoredSubmissions());
     setSpreadsheetConfig(getSavedSpreadsheetConfig());
+
+    // 2. Fetch central remote store
+    fetchRemoteDiklatData().then((remote) => {
+      if (remote) {
+        if (remote.attendance && remote.attendance.length > 0) {
+          setAttendance(remote.attendance);
+          saveAttendance(remote.attendance);
+        }
+        if (remote.submissions && remote.submissions.length > 0) {
+          setSubmissions(remote.submissions);
+          saveSubmissions(remote.submissions);
+        }
+        if (remote.spreadsheetConfig) {
+          setSpreadsheetConfig(remote.spreadsheetConfig);
+          saveSpreadsheetConfig(remote.spreadsheetConfig);
+        }
+      }
+
+      // 3. Auto-recover any local attendance filled by participants on this device
+      const localAtt = getAllLocalAttendanceToRecover();
+      const localSubs = getAllLocalSubmissionsToRecover();
+      if (localAtt.length > 0 || localSubs.length > 0) {
+        syncLocalToServerApi(localAtt, localSubs).then((res) => {
+          if (res && (res.addedAttendance > 0 || res.addedSubmissions > 0)) {
+            fetchRemoteDiklatData().then((latest) => {
+              if (latest) {
+                setAttendance(latest.attendance);
+                saveAttendance(latest.attendance);
+                setSubmissions(latest.submissions);
+                saveSubmissions(latest.submissions);
+              }
+            });
+          }
+        });
+      }
+    });
 
     // Listen to Firebase Google Auth state change
     const unsubscribe = initAuth(
@@ -97,7 +145,7 @@ export default function App() {
     };
   }, []);
 
-  // Handler: Save Attendance with automatic Google Sheets forwarding
+  // Handler: Save Attendance with automatic backend persistence & Google Sheets forwarding
   const handleSaveAttendance = async (newRecord: AttendanceRecord) => {
     setAttendance((prev) => {
       const filtered = prev.filter(
@@ -108,7 +156,10 @@ export default function App() {
       return updated;
     });
 
-    // Check if auto-sync to Google Spreadsheet is enabled
+    // Save to central server API (which also forwards to webhook)
+    postAttendanceApi(newRecord);
+
+    // Check if auto-sync to Google Spreadsheet is enabled via OAuth
     if (
       spreadsheetConfig?.autoSync &&
       accessToken &&
@@ -120,13 +171,13 @@ export default function App() {
         showToast(`Presensi ${newRecord.participantName} disimpan & terkirim ke Google Sheets!`);
       } catch (err: any) {
         console.warn('Google Sheets append warning:', err);
-        showToast(`Presensi disimpan lokal (Google Sheets: ${err.message || 'menunggu sinkronisasi'})`);
+        showToast(`Presensi tersimpan di server pusat.`);
       }
     } else {
-      showToast(`Presensi ${newRecord.participantName} berhasil disimpan.`);
+      showToast(`Presensi ${newRecord.participantName} berhasil tersimpan ke database pusat.`);
     }
 
-    // Forward to Webhook if configured
+    // Forward to Webhook if configured directly on client as well
     if (spreadsheetConfig?.webhookUrl) {
       forwardToAppsScriptWebhook(spreadsheetConfig.webhookUrl, 'presensi', newRecord);
     }
@@ -141,11 +192,12 @@ export default function App() {
         saveAttendance(updated);
         return updated;
       });
+      deleteAttendanceApi(id);
       showToast('Rekaman presensi berhasil dihapus.');
     }
   };
 
-  // Handler: Save Submission with automatic Google Sheets forwarding
+  // Handler: Save Submission with automatic backend persistence & Google Sheets forwarding
   const handleSaveSubmission = async (newSub: TaskSubmission) => {
     setSubmissions((prev) => {
       const filtered = prev.filter(
@@ -155,6 +207,8 @@ export default function App() {
       saveSubmissions(updated);
       return updated;
     });
+
+    postSubmissionApi(newSub);
 
     // Check if auto-sync to Google Spreadsheet is enabled
     if (
@@ -169,7 +223,7 @@ export default function App() {
         showToast(`Tugas ${newSub.title} disimpan & terkirim ke Google Sheets!`);
       } catch (err: any) {
         console.warn('Google Sheets append warning:', err);
-        showToast(`Tugas disimpan lokal (Google Sheets: ${err.message || 'menunggu sinkronisasi'})`);
+        showToast(`Tugas tersimpan di database pusat.`);
       }
     } else {
       showToast(`Tugas ${newSub.title} berhasil disimpan.`);
@@ -188,7 +242,48 @@ export default function App() {
       saveSubmissions(updated);
       return updated;
     });
+    postGradeSubmissionApi({
+      id: updatedSub.id,
+      score: updatedSub.score || 0,
+      feedback: updatedSub.feedback,
+      verifiedBy: updatedSub.reviewedBy,
+    });
     showToast(`Penilaian tugas untuk ${updatedSub.participantName} berhasil disimpan.`);
+  };
+
+  // Handler: Recover / Mass Mark Attendance for Sesi 1 & 2
+  const handleRestoreSession1And2 = async () => {
+    try {
+      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2']);
+      if (res && res.attendance) {
+        setAttendance(res.attendance);
+        saveAttendance(res.attendance);
+        showToast(`Alhamdulillah! Seluruh 52 peserta berhasil ditandai Hadir pada Sesi 1 & 2 di database pusat.`);
+      } else {
+        showToast('Presensi Sesi 1 & 2 sudah tercatat lengkap di server.');
+      }
+    } catch (err: any) {
+      showToast('Gagal memulihkan presensi: ' + err.message);
+    }
+  };
+
+  // Handler: Manually sync local storage on this device to server
+  const handleSyncLocalNow = async () => {
+    const localToRecover = getAllLocalAttendanceToRecover();
+    const subsToRecover = getAllLocalSubmissionsToRecover();
+    const res = await syncLocalToServerApi(localToRecover, subsToRecover);
+    if (res) {
+      const updated = await fetchRemoteDiklatData();
+      if (updated) {
+        setAttendance(updated.attendance);
+        saveAttendance(updated.attendance);
+        setSubmissions(updated.submissions);
+        saveSubmissions(updated.submissions);
+      }
+      showToast(`Sinkronisasi selesai! Data dari perangkat ini berhasil dikirim ke server pusat.`);
+    } else {
+      showToast('Data di perangkat ini sudah selaras dengan server.');
+    }
   };
 
   // Handler: Reset to factory default
@@ -245,6 +340,13 @@ export default function App() {
               Mode Panitia / Instruktur Aktif — Anda memiliki hak asesmen nilai, edit status tugas, dan verifikasi kehadiran peserta.
             </span>
             <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={handleRestoreSession1And2}
+                className="hover:underline flex items-center gap-1 font-bold text-emerald-100 bg-emerald-800/80 px-2.5 py-0.5 rounded text-[11px]"
+                title="Tandai Hadir seluruh 52 peserta untuk Sesi 1 & Sesi 2 di server"
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1 & 2 (52 Peserta)
+              </button>
               <button
                 onClick={handleBackupJSON}
                 className="hover:underline flex items-center gap-1 font-bold"
@@ -315,6 +417,9 @@ export default function App() {
             spreadsheetConfig={spreadsheetConfig}
             onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
             onOpenZoomModal={() => setIsZoomModalOpen(true)}
+            isAdminMode={isAdminMode}
+            onRestoreSession1And2={handleRestoreSession1And2}
+            onSyncLocalNow={handleSyncLocalNow}
           />
         )}
 

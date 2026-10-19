@@ -14,6 +14,7 @@ import {
   Check,
   LogOut,
   Send,
+  Download,
 } from 'lucide-react';
 import {
   SpreadsheetConfig,
@@ -23,6 +24,9 @@ import {
 } from '../services/googleSheets';
 import { googleSignIn, logoutGoogle } from '../services/googleAuth';
 import { Participant, AttendanceRecord, TaskSubmission } from '../types';
+import { postSpreadsheetConfigApi } from '../services/diklatApi';
+import { generateRecapCSV, generateAttendanceCSV, downloadCSV } from '../utils/export';
+import { DIKLAT_SESSIONS, DIKLAT_TASKS } from '../data/diklatData';
 
 interface GoogleSheetsSyncModalProps {
   isOpen: boolean;
@@ -128,6 +132,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       };
       saveSpreadsheetConfig(newConfig);
       onUpdateConfig(newConfig);
+      postSpreadsheetConfigApi(newConfig);
 
       // Perform initial sync immediately
       await syncAllDataToGoogleSheet(
@@ -166,6 +171,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
     saveSpreadsheetConfig(newConfig);
     onUpdateConfig(newConfig);
+    postSpreadsheetConfigApi(newConfig);
     onShowToast('Google Spreadsheet berhasil dihubungkan.');
     setManualInput('');
   };
@@ -174,6 +180,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   const handleDisconnect = () => {
     saveSpreadsheetConfig(null);
     onUpdateConfig(null);
+    postSpreadsheetConfigApi(null);
     onShowToast('Tautan Spreadsheet berhasil dilepas');
   };
 
@@ -204,12 +211,11 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
   // Save Webhook URL
   const handleSaveWebhook = () => {
+    let finalConfig: SpreadsheetConfig | null = null;
     if (spreadsheetConfig) {
-      const updated = { ...spreadsheetConfig, webhookUrl: webhookInput.trim() };
-      saveSpreadsheetConfig(updated);
-      onUpdateConfig(updated);
+      finalConfig = { ...spreadsheetConfig, webhookUrl: webhookInput.trim() };
     } else if (webhookInput.trim()) {
-      const dummyConfig: SpreadsheetConfig = {
+      finalConfig = {
         spreadsheetId: 'webhook-only',
         spreadsheetTitle: 'Integrasi Google Apps Script Webhook',
         spreadsheetUrl: '#',
@@ -217,10 +223,13 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
         webhookUrl: webhookInput.trim(),
         autoSync: true,
       };
-      saveSpreadsheetConfig(dummyConfig);
-      onUpdateConfig(dummyConfig);
     }
-    onShowToast('Pengaturan Google Apps Script Webhook disimpan');
+    if (finalConfig) {
+      saveSpreadsheetConfig(finalConfig);
+      onUpdateConfig(finalConfig);
+      postSpreadsheetConfigApi(finalConfig);
+      onShowToast('Pengaturan Google Apps Script Webhook disimpan ke database pusat');
+    }
   };
 
   // Copy sample script for Apps Script
@@ -632,6 +641,46 @@ function doPost(e) {
               </div>
             </div>
           )}
+
+          {/* Direct CSV Export Section (Works Instantly without setup) */}
+          <div className="mt-5 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-bold text-xs text-slate-800 block">
+                  Ekspor Cepat Berkas Spreadsheet (.CSV)
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  Dapat langsung dibuka di Microsoft Excel atau diimpor ke Google Sheets Drive Anda dalam 3 detik.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const csv = generateAttendanceCSV(participants, DIKLAT_SESSIONS, attendance);
+                  downloadCSV(csv, `Presensi_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
+                  onShowToast('Berkas CSV Presensi 52 peserta berhasil diunduh');
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Unduh CSV Presensi (52 Peserta)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const csv = generateRecapCSV(participants, DIKLAT_SESSIONS, DIKLAT_TASKS, attendance, submissions);
+                  downloadCSV(csv, `Rekap_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
+                  onShowToast('Berkas CSV Rekapitulasi Lengkap 52 peserta berhasil diunduh');
+                }}
+                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Unduh CSV Rekapitulasi Lengkap</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Modal Footer */}

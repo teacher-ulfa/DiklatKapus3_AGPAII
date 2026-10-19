@@ -511,5 +511,15 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     city: 'Kabupaten Probolinggo',
     province: 'Jawa Timur',
   },
+  {
+    id: 52,
+    no: 52,
+    name: 'Fita Sahara, S. Pd. I',
+    status: 'Guru Pendidikan Agama Islam',
+    kepalaPerpusStatus: 'Belum',
+    institution: 'SD Negeri 001 Sedanau Timur',
+    city: 'Provinsi Lain / Kab. Natuna',
+    province: 'Kepulauan Riau (Ibu Kota Tanjung Pinang)',
+  },
 ];
 

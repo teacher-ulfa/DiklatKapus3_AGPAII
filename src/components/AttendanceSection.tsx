@@ -3,6 +3,7 @@ import { Participant, AttendanceRecord, AttendanceStatus } from '../types';
 import { DIKLAT_SESSIONS, ZOOM_CONFIG } from '../data/diklatData';
 import { SignaturePad } from './SignaturePad';
 import { SpreadsheetConfig } from '../services/googleSheets';
+import { generateAttendanceCSV, downloadCSV } from '../utils/export';
 import {
   Calendar,
   CheckCircle2,
@@ -20,6 +21,10 @@ import {
   FileSpreadsheet,
   Video,
   ExternalLink,
+  Shield,
+  Download,
+  Database,
+  Sparkles,
 } from 'lucide-react';
 
 interface AttendanceSectionProps {
@@ -30,6 +35,9 @@ interface AttendanceSectionProps {
   spreadsheetConfig?: SpreadsheetConfig | null;
   onOpenSpreadsheetModal?: () => void;
   onOpenZoomModal?: () => void;
+  isAdminMode?: boolean;
+  onRestoreSession1And2?: () => void;
+  onSyncLocalNow?: () => void;
 }
 
 export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
@@ -40,6 +48,9 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   spreadsheetConfig,
   onOpenSpreadsheetModal,
   onOpenZoomModal,
+  isAdminMode = false,
+  onRestoreSession1And2,
+  onSyncLocalNow,
 }) => {
   // Form State
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | ''>('');
@@ -176,6 +187,97 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
           <div>
             <h4 className="font-bold text-sm">Presensi Terverifikasi!</h4>
             <p className="text-xs text-emerald-800 mt-0.5">{formSuccessMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Central Database Sync Info Banner */}
+      <div className="bg-emerald-950 text-white rounded-xl p-4 border border-emerald-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs sm:text-sm text-emerald-100">
+                Database Pusat Terhubung (Sinkron Real-time Seluruh Peserta)
+              </span>
+              <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Online
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-300/80 mt-0.5">
+              Data presensi otomatis tersimpan ke server bersama dan langsung tampil di tabel rekapitulasi untuk seluruh panitia & peserta.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onSyncLocalNow && (
+            <button
+              type="button"
+              onClick={onSyncLocalNow}
+              className="px-3 py-1.5 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 text-xs font-semibold rounded-lg transition border border-emerald-600/40 flex items-center gap-1.5"
+              title="Kirim ulang data presensi yang mungkin tersimpan di browser HP ini"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Sinkronkan HP Ini</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const csv = generateAttendanceCSV(participants, DIKLAT_SESSIONS, attendance);
+              downloadCSV(csv, `Presensi_Diklat_52Peserta_${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            className="px-3 py-1.5 bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-bold rounded-lg transition shadow-xs flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Unduh CSV Presensi</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Admin Fast Recovery: Sesi 1 & Sesi 2 Mass Attendance Banner */}
+      {isAdminMode && onRestoreSession1And2 && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-blue-500/15 border-2 border-amber-400/50 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-amber-500 text-white rounded-lg shrink-0 mt-0.5">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-slate-900">
+                  Pemulihan & Presensi Massal Sesi 1 & 2 (52 Peserta)
+                </span>
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
+                  Aksi Cepat Panitia
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b> dan <b>Sesi 2 (Pengorganisasian Informasi)</b>. Klik tombol di sebelah kanan untuk memastikan seluruh 52 peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onRestoreSession1And2}
+              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-lg transition shadow-sm flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              <span>Tandai Hadir Semua Sesi 1 & 2 (52 Peserta)</span>
+            </button>
+            {onOpenSpreadsheetModal && (
+              <button
+                type="button"
+                onClick={onOpenSpreadsheetModal}
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition flex items-center gap-1.5"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>Kirim ke Spreadsheet</span>
+              </button>
+            )}
           </div>
         </div>
       )}

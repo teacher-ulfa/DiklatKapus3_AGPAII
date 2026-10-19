@@ -112,3 +112,60 @@ export const generateRecapCSV = (
 
   return [headers.map(escapeCSV).join(';'), ...rows].join('\r\n');
 };
+
+export const generateAttendanceCSV = (
+  participants: Participant[],
+  sessions: DiklatSession[],
+  attendanceList: AttendanceRecord[]
+): string => {
+  const escapeCSV = (val: string | number | undefined | null) => {
+    if (val === undefined || val === null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const headers = [
+    'No',
+    'Nama Lengkap',
+    'Jabatan',
+    'Instansi Sekolah / Madrasah',
+    'Kabupaten / Kota',
+    'Provinsi',
+    ...sessions.map((s) => `${s.code} - ${s.title}`),
+    'Total Hadir',
+    '% Kehadiran',
+  ];
+
+  const rows = participants.map((p) => {
+    let totalHadir = 0;
+    const sessionCols = sessions.map((s) => {
+      const att = attendanceList.find(
+        (a) => a.participantId === p.id && a.sessionId === s.id
+      );
+      if (att && att.status === 'Hadir') {
+        totalHadir++;
+        return `Hadir (${att.timestamp})`;
+      } else if (att) {
+        return att.status;
+      }
+      return 'Belum Mengisi';
+    });
+
+    const attendancePct = Math.round((totalHadir / sessions.length) * 100);
+
+    return [
+      p.no,
+      p.name,
+      p.status,
+      p.institution,
+      p.city,
+      p.province,
+      ...sessionCols,
+      totalHadir,
+      `${attendancePct}%`,
+    ].map(escapeCSV).join(';');
+  });
+
+  return [headers.map(escapeCSV).join(';'), ...rows].join('\r\n');
+};
+
