@@ -42,6 +42,7 @@ interface HomeSectionProps {
   spreadsheetConfig?: SpreadsheetConfig | null;
   onOpenSpreadsheetModal?: () => void;
   onOpenZoomModal?: () => void;
+  isAdminMode?: boolean;
 }
 
 export const HomeSection: React.FC<HomeSectionProps> = ({
@@ -52,6 +53,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
   spreadsheetConfig,
   onOpenSpreadsheetModal,
   onOpenZoomModal,
+  isAdminMode = false,
 }) => {
   // Calculated stats
   const totalParticipants = participants.length;
@@ -177,53 +179,55 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
             </a>
           </div>
 
-          {/* Google Sheets Live Sync Banner */}
-          <div className="mb-8 p-3.5 bg-emerald-950/70 border border-emerald-400/30 rounded-xl backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-300 shrink-0">
-                <FileSpreadsheet className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-white">Integrasi Google Spreadsheet</span>
-                  {spreadsheetConfig ? (
-                    <span className="bg-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
-                      Aktif: {spreadsheetConfig.spreadsheetTitle}
-                    </span>
-                  ) : (
-                    <span className="bg-white/10 text-emerald-200 text-[10px] px-2 py-0.5 rounded">
-                      Tersedia
-                    </span>
-                  )}
+          {/* Google Sheets Live Sync Banner (Admin / Owner Only) */}
+          {isAdminMode && (
+            <div className="mb-8 p-3.5 bg-emerald-950/70 border border-emerald-400/30 rounded-xl backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-300 shrink-0">
+                  <FileSpreadsheet className="w-5 h-5" />
                 </div>
-                <p className="text-emerald-200/80 mt-0.5">
-                  Kirim seluruh rekaman presensi dan dokumen tugas secara langsung ke Google Sheets.
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white">Integrasi Google Spreadsheet Panitia</span>
+                    {spreadsheetConfig ? (
+                      <span className="bg-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                        Aktif: {spreadsheetConfig.spreadsheetTitle}
+                      </span>
+                    ) : (
+                      <span className="bg-white/10 text-emerald-200 text-[10px] px-2 py-0.5 rounded">
+                        Tersedia untuk Pemilik
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-emerald-200/80 mt-0.5">
+                    Kirim seluruh rekaman presensi dan dokumen tugas secara langsung ke Google Sheets.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {spreadsheetConfig?.spreadsheetUrl && spreadsheetConfig.spreadsheetUrl !== '#' && (
+                  <a
+                    href={spreadsheetConfig.spreadsheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-semibold transition flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Buka Sheet
+                  </a>
+                )}
+                {onOpenSpreadsheetModal && (
+                  <button
+                    onClick={onOpenSpreadsheetModal}
+                    className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>{spreadsheetConfig ? 'Kelola Spreadsheet' : 'Hubungkan Spreadsheet'}</span>
+                  </button>
+                )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {spreadsheetConfig?.spreadsheetUrl && spreadsheetConfig.spreadsheetUrl !== '#' && (
-                <a
-                  href={spreadsheetConfig.spreadsheetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-semibold transition flex items-center gap-1"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" /> Buka Sheet
-                </a>
-              )}
-              {onOpenSpreadsheetModal && (
-                <button
-                  onClick={onOpenSpreadsheetModal}
-                  className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>{spreadsheetConfig ? 'Kelola Spreadsheet' : 'Hubungkan Spreadsheet'}</span>
-                </button>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* Quick Action Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
@@ -254,14 +258,16 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigate('rekap')}
+              onClick={() => onNavigate(isAdminMode ? 'rekap' : 'cek-mandiri')}
               className="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all border border-white/20 group text-left sm:col-span-2 lg:col-span-1"
             >
               <div>
                 <span className="text-xs text-emerald-300 block uppercase tracking-wider font-semibold">
                   Aktivitas 03
                 </span>
-                <span className="text-base font-bold">Rekapitulasi {totalParticipants} Peserta</span>
+                <span className="text-base font-bold">
+                  {isAdminMode ? `Rekapitulasi ${totalParticipants} Peserta` : 'Rekap Progres Mandiri'}
+                </span>
               </div>
               <ArrowRight className="w-5 h-5 text-emerald-300 group-hover:translate-x-1 transition-transform" />
             </button>

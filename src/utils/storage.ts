@@ -3,16 +3,18 @@ import { INITIAL_PARTICIPANTS } from '../data/participants';
 import { INITIAL_ATTENDANCE, INITIAL_SUBMISSIONS } from '../data/diklatData';
 
 const STORAGE_KEYS = {
-  PARTICIPANTS: 'diklat_perpus_participants_v9',
-  ATTENDANCE: 'diklat_perpus_attendance_v9',
+  PARTICIPANTS: 'diklat_perpus_participants_v10',
+  ATTENDANCE: 'diklat_perpus_attendance_v10',
   SUBMISSIONS: 'diklat_perpus_submissions_v5',
   ADMIN_MODE: 'diklat_perpus_admin_mode_v4',
+  SHARED_WEBHOOK: 'diklat_perpus_shared_webhook_url',
 };
 
 // Collector to recover any attendance filled on this device from previous keys
 export const getAllLocalAttendanceToRecover = (): AttendanceRecord[] => {
   const recovered: AttendanceRecord[] = [];
   const keys = [
+    'diklat_perpus_attendance_v10',
     'diklat_perpus_attendance_v9',
     'diklat_perpus_attendance_v8',
     'diklat_perpus_attendance_v7',
@@ -116,12 +118,20 @@ export const getStoredAttendance = (): AttendanceRecord[] => {
         const hasSesi1 = parsed.some((a) => a.sessionId === 'sesi-1');
         const hasSesi2 = parsed.some((a) => a.sessionId === 'sesi-2');
         const hasSesi3 = parsed.some((a) => a.sessionId === 'sesi-3');
-        const hasAllSeeds = hasSesi1 && hasSesi2 && hasSesi3 && parsed.length >= INITIAL_ATTENDANCE.length;
+        const hasSesi4 = parsed.some((a) => a.sessionId === 'sesi-4');
+        const hasSesi5 = parsed.some((a) => a.sessionId === 'sesi-5');
+        const hasAllSeeds =
+          hasSesi1 &&
+          hasSesi2 &&
+          hasSesi3 &&
+          hasSesi4 &&
+          hasSesi5 &&
+          parsed.length >= INITIAL_ATTENDANCE.length;
         if (hasAllSeeds) {
           return parsed;
         }
 
-        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost and Sesi 1, 2, 3 are complete
+        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost and Sesi 1 s.d 5 are complete
         const merged = [...parsed];
         INITIAL_ATTENDANCE.forEach((seed) => {
           const exists = merged.some(
@@ -138,6 +148,22 @@ export const getStoredAttendance = (): AttendanceRecord[] => {
   }
   saveAttendance(INITIAL_ATTENDANCE);
   return INITIAL_ATTENDANCE;
+};
+
+export const getSharedWebhookUrl = (): string | null => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.SHARED_WEBHOOK);
+  } catch {
+    return null;
+  }
+};
+
+export const saveSharedWebhookUrl = (url: string): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SHARED_WEBHOOK, url);
+  } catch (err) {
+    console.error('Failed to save shared webhook url', err);
+  }
 };
 
 export const saveAttendance = (records: AttendanceRecord[]): void => {

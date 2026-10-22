@@ -137,7 +137,7 @@ export const triggerMassAttendanceSessionApi = async (
 
 export const triggerSyncAllToWebhookApi = async (
   webhookUrl?: string
-): Promise<{ success: boolean; sentCount: number; failedCount: number; total: number } | null> => {
+): Promise<{ success: boolean; sentCount: number; sentTugasCount?: number; failedCount?: number; total?: number } | null> => {
   try {
     const res = await fetch('/api/webhook/sync-all', {
       method: 'POST',
@@ -149,5 +149,25 @@ export const triggerSyncAllToWebhookApi = async (
   } catch (err) {
     console.warn('triggerSyncAllToWebhookApi error:', err);
     return null;
+  }
+};
+
+export const testWebhookApi = async (
+  webhookUrl: string
+): Promise<{ success: boolean; status?: number; error?: string }> => {
+  try {
+    const res = await fetch('/api/webhook/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || 'Server error' };
+    }
+    const data = await res.json();
+    return { success: data.success, status: data.status };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Jaringan tidak dapat menjangkau webhook' };
   }
 };

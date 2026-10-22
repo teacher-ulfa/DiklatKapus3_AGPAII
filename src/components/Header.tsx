@@ -89,16 +89,18 @@ export const Header: React.FC<HeaderProps> = ({
             >
               Pengumpulan Tugas (8 Tugas)
             </button>
-            <button
-              onClick={() => onTabChange('rekap')}
-              className={`hover:text-emerald-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeTab === 'rekap'
-                  ? 'text-emerald-800 font-semibold border-b-2 border-emerald-700'
-                  : ''
-              }`}
-            >
-              Rekapitulasi
-            </button>
+            {isAdminMode && (
+              <button
+                onClick={() => onTabChange('rekap')}
+                className={`hover:text-emerald-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  activeTab === 'rekap'
+                    ? 'text-emerald-800 font-semibold border-b-2 border-emerald-700'
+                    : ''
+                }`}
+              >
+                Rekapitulasi Panitia
+              </button>
+            )}
             <button
               onClick={() => onTabChange('cek-mandiri')}
               className={`hover:text-emerald-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
@@ -107,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : ''
               }`}
             >
-              Cek Progres Mandiri
+              {isAdminMode ? 'Cek Progres Mandiri' : 'Rekap Progres Mandiri'}
             </button>
           </nav>
 
@@ -125,22 +127,24 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Ruang Zoom Aktif" />
             </button>
 
-            {/* Google Sheets Trigger */}
-            <button
-              onClick={onOpenSpreadsheetModal}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap border shadow-sm ${
-                isSpreadsheetConnected
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
-                  : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300'
-              }`}
-              title="Kelola Sinkronisasi Google Sheets"
-            >
-              <FileSpreadsheet className={`w-3.5 h-3.5 ${isSpreadsheetConnected ? 'text-emerald-200' : 'text-emerald-600'}`} />
-              <span className="hidden sm:inline">Spreadsheet</span>
-              {isSpreadsheetConnected && (
-                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" title="Terkoneksi" />
-              )}
-            </button>
+            {/* Google Sheets Trigger (Admin / Owner Only) */}
+            {isAdminMode && (
+              <button
+                onClick={onOpenSpreadsheetModal}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap border shadow-sm ${
+                  isSpreadsheetConnected
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                    : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300'
+                }`}
+                title="Kelola Sinkronisasi Google Sheets"
+              >
+                <FileSpreadsheet className={`w-3.5 h-3.5 ${isSpreadsheetConnected ? 'text-emerald-200' : 'text-emerald-600'}`} />
+                <span className="hidden sm:inline">Spreadsheet</span>
+                {isSpreadsheetConnected && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" title="Terkoneksi" />
+                )}
+              </button>
+            )}
 
             <a
               href={DRIVE_MODUL_URL}
@@ -250,21 +254,23 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Tugas
           </button>
-          <button
-            onClick={() => onTabChange('rekap')}
-            className={`px-3 py-1 text-xs rounded whitespace-nowrap ${
-              activeTab === 'rekap' ? 'bg-emerald-800 text-white font-medium' : 'text-slate-600'
-            }`}
-          >
-            Rekap
-          </button>
+          {isAdminMode && (
+            <button
+              onClick={() => onTabChange('rekap')}
+              className={`px-3 py-1 text-xs rounded whitespace-nowrap ${
+                activeTab === 'rekap' ? 'bg-emerald-800 text-white font-medium' : 'text-slate-600'
+              }`}
+            >
+              Rekap Panitia
+            </button>
+          )}
           <button
             onClick={() => onTabChange('cek-mandiri')}
             className={`px-3 py-1 text-xs rounded whitespace-nowrap ${
               activeTab === 'cek-mandiri' ? 'bg-emerald-800 text-white font-medium' : 'text-slate-600'
             }`}
           >
-            Cek Mandiri
+            {isAdminMode ? 'Cek Mandiri' : 'Rekap Mandiri'}
           </button>
           <button
             onClick={onOpenZoomModal}
@@ -272,16 +278,18 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Video className="w-3 h-3 text-blue-100" /> Zoom
           </button>
-          <button
-            onClick={onOpenSpreadsheetModal}
-            className={`px-2.5 py-1 text-xs rounded whitespace-nowrap font-semibold border flex items-center gap-1 shrink-0 ${
-              isSpreadsheetConnected
-                ? 'bg-emerald-700 text-white border-emerald-800'
-                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-            }`}
-          >
-            <FileSpreadsheet className="w-3 h-3" /> Sheets
-          </button>
+          {isAdminMode && (
+            <button
+              onClick={onOpenSpreadsheetModal}
+              className={`px-2.5 py-1 text-xs rounded whitespace-nowrap font-semibold border flex items-center gap-1 shrink-0 ${
+                isSpreadsheetConnected
+                  ? 'bg-emerald-700 text-white border-emerald-800'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-3 h-3" /> Sheets
+            </button>
+          )}
           <a
             href={DRIVE_MODUL_URL}
             target="_blank"

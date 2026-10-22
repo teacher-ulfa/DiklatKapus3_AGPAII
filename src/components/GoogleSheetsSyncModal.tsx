@@ -25,10 +25,12 @@ import {
   createDiklatSpreadsheet,
   saveSpreadsheetConfig,
   syncAllDataToGoogleSheet,
+  syncAllToAppsScriptDirectly,
 } from '../services/googleSheets';
+import { saveSharedWebhookUrl } from '../utils/storage';
 import { googleSignIn, logoutGoogle } from '../services/googleAuth';
 import { Participant, AttendanceRecord, TaskSubmission } from '../types';
-import { postSpreadsheetConfigApi, triggerSyncAllToWebhookApi } from '../services/diklatApi';
+import { postSpreadsheetConfigApi, triggerSyncAllToWebhookApi, testWebhookApi } from '../services/diklatApi';
 import {
   generateRecapCSV,
   generateAttendanceCSV,
@@ -257,6 +259,93 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     }
   };
 
+  // Save Webhook URL & Immediately Push All Data in 1-Click
+  const handleSaveAndPushWebhook = async () => {
+    const rawUrl = webhookInput.trim() || spreadsheetConfig?.webhookUrl || '';
+    if (!rawUrl) {
+      onShowToast('Masukkan URL Webhook Google Apps Script terlebih dahulu');
+      return;
+    }
+    if (rawUrl.includes('docs.google.com/spreadsheets')) {
+      onShowToast('⚠️ Tautan yang Anda masukkan adalah tautan file Spreadsheet, bukan tautan Web App Apps Script.');
+      return;
+    }
+
+    const finalConfig: SpreadsheetConfig = {
+      spreadsheetId: 'webhook-only',
+      spreadsheetTitle: 'Integrasi Google Apps Script Webhook',
+      spreadsheetUrl: '#',
+      connectedAt: new Date().toISOString(),
+      webhookUrl: rawUrl,
+      autoSync: true,
+    };
+
+    saveSpreadsheetConfig(finalConfig);
+    saveSharedWebhookUrl(rawUrl);
+    onUpdateConfig(finalConfig);
+    postSpreadsheetConfigApi(finalConfig);
+
+    setIsSyncingWebhook(true);
+    try {
+      // 1. Try server-side sync first (if running on Node server)
+      let syncedOnServer = false;
+      try {
+        const res = await triggerSyncAllToWebhookApi(rawUrl);
+        if (res && res.success) {
+          syncedOnServer = true;
+          onShowToast(
+            `🎉 ALHAMDULILLAH! ${res.sentCount} data presensi & ${res.sentTugasCount || 0} tugas berhasil masuk ke Spreadsheet Anda!`
+          );
+        }
+      } catch {
+        syncedOnServer = false;
+      }
+
+      // 2. Direct browser fallback (crucial for Vercel/GitHub static deployment!)
+      if (!syncedOnServer) {
+        const directRes = await syncAllToAppsScriptDirectly(rawUrl, attendance, submissions);
+        if (directRes && directRes.success) {
+          onShowToast(
+            `🎉 ALHAMDULILLAH! ${directRes.sentCount} data presensi & ${directRes.sentTugasCount} tugas berhasil terkirim langsung dari browser ke Spreadsheet Anda!`
+          );
+        } else {
+          onShowToast('Gagal mengirim ke Webhook. Pastikan URL Apps Script benar dan di-deploy dengan akses "Anyone".');
+        }
+      }
+    } catch (err: any) {
+      onShowToast(err.message || 'Gagal mengirim data ke Webhook');
+    } finally {
+      setIsSyncingWebhook(false);
+    }
+  };
+
+  // Test ping webhook
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const handleTestWebhook = async () => {
+    const url = webhookInput.trim() || spreadsheetConfig?.webhookUrl;
+    if (!url) {
+      onShowToast('Masukkan URL Webhook Google Apps Script terlebih dahulu');
+      return;
+    }
+    if (url.includes('docs.google.com/spreadsheets')) {
+      onShowToast('⚠️ Ini tautan file Spreadsheet biasa, bukan Web App Apps Script (script.google.com/macros/s/.../exec)');
+      return;
+    }
+    setIsTestingWebhook(true);
+    try {
+      const res = await testWebhookApi(url);
+      if (res && res.success) {
+        onShowToast('✅ Berhasil terhubung ke Google Spreadsheet! Webhook siap menerima presensi & tugas secara real-time.');
+      } else {
+        onShowToast(`Koneksi webhook gagal: ${res.error || 'Periksa apakah Web App di-deploy dengan akses Anyone'}`);
+      }
+    } catch (err: any) {
+      onShowToast('Gagal tes koneksi: ' + err.message);
+    } finally {
+      setIsTestingWebhook(false);
+    }
+  };
+
   // Batch Push All Records to Apps Script Webhook
   const handleBatchPushWebhook = async () => {
     const url = webhookInput.trim() || spreadsheetConfig?.webhookUrl;
@@ -264,16 +353,33 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       onShowToast('Masukkan URL Webhook Google Apps Script terlebih dahulu');
       return;
     }
+    if (url.includes('docs.google.com/spreadsheets')) {
+      onShowToast('⚠️ Tautan file spreadsheet tidak bisa menerima POST. Gunakan Web App Apps Script.');
+      return;
+    }
 
     setIsSyncingWebhook(true);
     try {
-      const res = await triggerSyncAllToWebhookApi(url);
-      if (res && res.success) {
-        onShowToast(
-          `Sukses! ${res.sentCount} data presensi berhasil dikirim ke Google Sheets via Webhook.`
-        );
-      } else {
-        onShowToast('Gagal mengirim ke Webhook. Pastikan URL Apps Script benar dan di-deploy sebagai Web App (Anyone).');
+      let synced = false;
+      try {
+        const res = await triggerSyncAllToWebhookApi(url);
+        if (res && res.success) {
+          synced = true;
+          onShowToast(
+            `Sukses! ${res.sentCount} data presensi & ${res.sentTugasCount || 0} tugas terkirim ke Google Sheets via Webhook.`
+          );
+        }
+      } catch {
+        synced = false;
+      }
+
+      if (!synced) {
+        const directRes = await syncAllToAppsScriptDirectly(url, attendance, submissions);
+        if (directRes && directRes.success) {
+          onShowToast(
+            `Sukses! ${directRes.sentCount} data presensi & ${directRes.sentTugasCount} tugas terkirim langsung dari browser ke Google Sheets via Webhook.`
+          );
+        }
       }
     } catch (err: any) {
       onShowToast(err.message || 'Gagal mengirim data ke Webhook');
@@ -325,48 +431,132 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     onShowToast(`Berkas CSV 10 Kolom Resmi (${attendance.length} baris) berhasil diunduh`);
   };
 
-  // Copy sample script for Apps Script (Matching Panitia 10 Columns)
-  const sampleAppsScript = `// Kode Google Apps Script Presensi (Ekstensi > Apps Script di Spreadsheet Anda)
+  // Copy sample script for Apps Script (Real-time sync for Presensi & Tugas)
+  const sampleAppsScript = `// GOOGLE APPS SCRIPT SINKRONISASI REAL-TIME (PRESENSI & TUGAS)
+// Diklat Kepala Perpustakaan DPW AGPAII Jatim & UPT Perpustakaan UIN SATU
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({
+    result: 'success',
+    status: 'online',
+    message: 'Webhook Google Apps Script Diklat AGPAII Jatim & UIN SATU Aktif dan Siap Digunakan'
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet();
-    var contents = JSON.parse(e.postData.contents);
-    var type = contents.type || 'presensi';
-    var data = contents.data || contents;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var payload = JSON.parse(e.postData.contents);
+    var type = payload.type || 'presensi';
+    var data = payload.data || payload;
 
-    // Prioritaskan sheet pertama atau sheet aktif
-    var targetSheet = sheet.getSheetByName('Presensi Diklat') || sheet.getActiveSheet() || sheet.getSheets()[0];
+    // 1. Inisialisasi Sheet Presensi
+    var presensiSheet = ss.getSheetByName('Presensi Diklat') || ss.getActiveSheet();
+    if (presensiSheet.getLastRow() === 0) {
+      presensiSheet.appendRow([
+        'Waktu Kirim', 'Tanggal Sesi', 'No Peserta', 'Nama Lengkap', 
+        'Instansi Sekolah/Madrasah', 'Kabupaten / Kota', 'Sesi', 
+        'Materi Pelatihan', 'Status Kehadiran', 'Catatan Peserta', 'Bukti Foto', 'Tanda Tangan'
+      ]);
+      presensiSheet.getRange('A1:L1').setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+    }
+
+    // 2. Inisialisasi Sheet Tugas
+    var tugasSheet = ss.getSheetByName('Pengumpulan Tugas');
+    if (!tugasSheet) {
+      tugasSheet = ss.insertSheet('Pengumpulan Tugas');
+      tugasSheet.appendRow([
+        'Waktu Kirim', 'Tanggal Tugas', 'No Peserta', 'Nama Lengkap', 
+        'Instansi', 'Kabupaten / Kota', 'Kode Tugas', 'Judul Tagihan Tugas', 
+        'Judul Berkas / Karya', 'Tautan Berkas (Drive / YouTube)', 'Catatan Peserta', 'Nilai', 'Status'
+      ]);
+      tugasSheet.getRange('A1:M1').setBackground('#1E40AF').setFontColor('#FFFFFF').setFontWeight('bold');
+    }
+
+    var now = new Date();
+    var timeStampStr = Utilities.formatDate(now, 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
 
     if (type === 'presensi') {
-      // 10 Kolom Panitia:
-      // Time stemp, Tanggal, No Pesesrta, Nama, Instansi, Kab/Ko, Sesi-1, Materi, Kehadiran, Catatan
-      var now = new Date();
-      var timeStampStr = Utilities.formatDate(now, "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
-      var tanggalStr = data.sessionDate || Utilities.formatDate(now, "Asia/Jakarta", "dd MMMM yyyy");
-
-      targetSheet.appendRow([
-        timeStampStr,                              // 1. Time stemp
-        tanggalStr,                                // 2. Tanggal
-        data.participantNo || data.participantId,  // 3. No Pesesrta
-        data.participantName,                      // 4. Nama
-        data.institution,                          // 5. Instansi
-        data.city,                                 // 6. Kab/Ko
-        data.sessionCode || data.sessionId,        // 7. Sesi-1
-        data.sessionTitle,                         // 8. Materi
-        data.status || "Hadir",                    // 9. Kehadiran
-        data.notes || "-"                          // 10. Catatan
+      presensiSheet.appendRow([
+        timeStampStr,
+        data.sessionDate || Utilities.formatDate(now, 'Asia/Jakarta', 'dd MMMM yyyy'),
+        data.participantNo || data.participantId,
+        data.participantName,
+        data.institution,
+        data.city || '-',
+        data.sessionCode || data.sessionId,
+        data.sessionTitle,
+        data.status || 'Hadir',
+        data.notes || '-',
+        data.photoProof ? 'Ada Foto Bukti' : (data.hasPhoto || '-'),
+        data.signature ? 'Bertandatangan Digital' : (data.hasSignature || '-')
       ]);
     } else if (type === 'tugas') {
-      var tugasSheet = sheet.getSheetByName('Pengumpulan Tugas') || sheet.insertSheet('Pengumpulan Tugas');
       tugasSheet.appendRow([
-        new Date(), data.submittedAt, data.participantId, data.participantName,
-        data.institution, data.taskId, data.taskTitle, data.title,
-        data.docLink || data.fileUrl || '-', data.notes || '-'
+        timeStampStr,
+        data.submittedAt || timeStampStr,
+        data.participantNo || data.participantId,
+        data.participantName,
+        data.institution,
+        data.city || '-',
+        data.taskCode || data.taskId,
+        data.taskTitle,
+        data.title || '-',
+        data.fileUrl || data.docLink || '-',
+        data.notes || '-',
+        data.score !== undefined ? data.score : '-',
+        data.status || 'Belum Dinilai'
       ]);
+    } else if (type === 'batch_all' || type === 'batch_presensi') {
+      var presensiList = payload.presensi || (Array.isArray(data) ? data : []);
+      if (presensiList.length > 0) {
+        var pRows = presensiList.map(function(item) {
+          return [
+            item.timestamp || timeStampStr,
+            item.sessionDate || Utilities.formatDate(now, 'Asia/Jakarta', 'dd MMMM yyyy'),
+            item.participantNo || item.participantId,
+            item.participantName,
+            item.institution,
+            item.city || '-',
+            item.sessionCode || item.sessionId,
+            item.sessionTitle,
+            item.status || 'Hadir',
+            item.notes || '-',
+            item.photoProof ? 'Ada Foto Bukti' : (item.hasPhoto || '-'),
+            item.signature ? 'Bertandatangan Digital' : (item.hasSignature || '-')
+          ];
+        });
+        presensiSheet.getRange(presensiSheet.getLastRow() + 1, 1, pRows.length, pRows[0].length).setValues(pRows);
+      }
+
+      var tugasList = payload.tugas || [];
+      if (tugasList.length > 0) {
+        var tRows = tugasList.map(function(item) {
+          return [
+            item.submittedAt || timeStampStr,
+            item.submittedAt || timeStampStr,
+            item.participantNo || item.participantId,
+            item.participantName,
+            item.institution,
+            item.city || '-',
+            item.taskCode || item.taskId,
+            item.taskTitle,
+            item.title || '-',
+            item.fileUrl || item.docLink || '-',
+            item.notes || '-',
+            item.score !== undefined ? item.score : '-',
+            item.status || 'Belum Dinilai'
+          ];
+        });
+        tugasSheet.getRange(tugasSheet.getLastRow() + 1, 1, tRows.length, tRows[0].length).setValues(tRows);
+      }
     }
-    return ContentService.createTextOutput(JSON.stringify({result: "success"})).setMimeType(ContentService.MimeType.JSON);
+
+    return ContentService.createTextOutput(JSON.stringify({ result: 'success', message: 'Data berhasil disinkronkan' }))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({result: "error", error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ result: 'error', error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }`;
 
@@ -454,7 +644,7 @@ function doPost(e) {
                   Sudah Punya File Google Spreadsheet? Salin &amp; Tempel dalam 3 Detik!
                 </h3>
                 <p className="text-xs text-emerald-100/90 leading-relaxed">
-                  Semua <b>{attendance.length} data presensi</b> (Sesi 1, Sesi 2, &amp; Sesi 3 untuk seluruh {participants.length} peserta) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
+                  Semua <b>{attendance.length} data presensi</b> (Sesi 1 s.d 5 untuk seluruh {participants.length} peserta, termasuk 21 &amp; 22 Oktober) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
                 </p>
 
                 <div className="pt-2 flex flex-wrap gap-2.5">
@@ -847,76 +1037,174 @@ function doPost(e) {
 
           {/* TAB 3: Webhook */}
           {activeSubTab === 'webhook' && (
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                  Kirim Data Tanpa Login Google (Google Apps Script Webhook)
-                </p>
-                <p className="mt-1 text-slate-600">
-                  Dengan memasang Apps Script di Spreadsheet Anda, data presensi dikirim langsung dari server ke spreadsheet Anda tanpa perlu otorisasi Google OAuth.
-                </p>
-              </div>
+            <div className="space-y-5">
+              {/* Status Banner */}
+              {spreadsheetConfig?.webhookUrl ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1.5 bg-emerald-600 text-white rounded-lg shrink-0 mt-0.5">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold block text-emerald-950 text-sm">
+                        Webhook Terhubung &amp; Aktif
+                      </span>
+                      <p className="text-[11px] font-mono text-emerald-800 break-all mt-0.5">
+                        {spreadsheetConfig.webhookUrl}
+                      </p>
+                      <span className="inline-block mt-1 text-[10px] bg-emerald-200 text-emerald-900 font-semibold px-2 py-0.5 rounded">
+                        Setiap presensi &amp; tugas baru otomatis terkirim real-time
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleTestWebhook}
+                      disabled={isTestingWebhook}
+                      className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
+                      <span>Tes Ping</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchPushWebhook}
+                      disabled={isSyncingWebhook}
+                      className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSyncingWebhook ? 'Mengirim...' : `Kirim Ulang ${attendance.length} Data`}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="font-bold text-sm">Status: Belum Terhubung ke Spreadsheet Otomatis</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Agar presensi dan tugas dapat terkirim secara otomatis ke Google Spreadsheet Anda tanpa login Google berulang-ulang (termasuk saat diakses peserta via Vercel/GitHub), silakan pasang <b>Google Apps Script Webhook</b> melalui 4 langkah mudah di bawah ini.
+                  </p>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Google Apps Script Web App URL:
+              {/* Input Webhook URL */}
+              <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <label className="block text-xs font-bold text-slate-800">
+                  Tautan Aplikasi Web Apps Script (URL berakhiran /exec):
                 </label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="url"
                     value={webhookInput}
                     onChange={(e) => setWebhookInput(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
-                    className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                    className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2.5 font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white shadow-2xs"
                   />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveWebhook}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold whitespace-nowrap"
-                    >
-                      Simpan URL
-                    </button>
-                    <button
-                      onClick={handleBatchPushWebhook}
-                      disabled={isSyncingWebhook || !webhookInput.trim()}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingWebhook ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingWebhook ? 'Mengirim...' : 'Kirim Semua Sekarang'}</span>
-                    </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAndPushWebhook}
+                    disabled={isSyncingWebhook || !webhookInput.trim()}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold whitespace-nowrap flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>{isSyncingWebhook ? 'Sedang Mengirim...' : `Simpan & Kirim ${attendance.length} Data Sekarang`}</span>
+                  </button>
+                </div>
+
+                {/* Validation Warning if user inputs spreadsheet URL */}
+                {webhookInput.includes('docs.google.com/spreadsheets') && (
+                  <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-xs space-y-1.5 animate-fade-in">
+                    <span className="font-bold flex items-center gap-1.5 text-rose-900">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      PERHATIAN: Ini adalah tautan file Spreadsheet biasa, BUKAN tautan Web App Apps Script!
+                    </span>
+                    <p className="leading-relaxed">
+                      Google Spreadsheet tidak menerima kiriman data langsung dari URL file biasa. Yang dibutuhkan adalah <b>URL Web App Apps Script</b> (berawalan <code>https://script.google.com/macros/s/.../exec</code>).
+                    </p>
+                    <p className="font-bold text-rose-950 pt-1">
+                      💡 Solusi Instan 3 Detik: Klik tab <b>"Salin Cepat / Download"</b> di menu atas! Anda bisa menyalin seluruh {attendance.length} data dan menempelkannya (Ctrl + V) langsung ke file Google Spreadsheet Anda.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 4 Step Tutorial */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  Petunjuk 4 Langkah Pemasangan Webhook di Google Sheets:
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] inline-flex items-center justify-center mr-1.5">
+                      1
+                    </span>
+                    <span className="font-bold text-slate-800">Buka Google Sheets &amp; Apps Script</span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      Buka file Google Spreadsheet Anda di browser &gt; Klik menu <b>Ekstensi (Extensions)</b> &gt; pilih <b>Apps Script</b>.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] inline-flex items-center justify-center mr-1.5">
+                      2
+                    </span>
+                    <span className="font-bold text-slate-800">Tempel Kode Skrip</span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      Hapus semua tulisan di editor Apps Script, klik tombol <b>"Salin Kode Skrip"</b> di bawah, lalu tekan <b>Ctrl + V</b> di editor.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] inline-flex items-center justify-center mr-1.5">
+                      3
+                    </span>
+                    <span className="font-bold text-slate-800">Deploy sebagai Web App (Siapa Saja)</span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      Klik <b>Terapkan (Deploy)</b> &gt; <b>Deployment baru</b> &gt; Pilih jenis <b>Aplikasi Web</b>. Pada <i>Siapa yang memiliki akses (Who has access)</i>, <b>WAJIB pilih "Siapa saja (Anyone)"</b>, lalu klik Deploy.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] inline-flex items-center justify-center mr-1.5">
+                      4
+                    </span>
+                    <span className="font-bold text-slate-800">Salin URL &amp; Kirim Data</span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      Salin <b>URL Aplikasi Web</b> yang berakhiran <code>/exec</code>, tempelkan ke kotak di atas, lalu klik tombol hijau <b>Simpan &amp; Kirim {attendance.length} Data Sekarang</b>.
+                    </p>
                   </div>
                 </div>
               </div>
 
+              {/* Code Box */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-slate-700">
                     Skrip Google Apps Script Siap Pasang:
                   </span>
                   <button
+                    type="button"
                     onClick={copyScriptToClipboard}
-                    className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold hover:underline"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition"
                   >
                     {isCopiedScript ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" /> Tersalin!
+                        <Check className="w-3.5 h-3.5 text-emerald-700" /> Tersalin!
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" /> Salin Kode Skrip
+                        <Copy className="w-3.5 h-3.5 text-emerald-700" /> Salin Kode Skrip
                       </>
                     )}
                   </button>
                 </div>
-                <pre className="text-[11px] bg-slate-900 text-slate-200 p-3 rounded-lg overflow-x-auto font-mono max-h-48 border border-slate-700">
+                <pre className="text-[11px] bg-slate-900 text-slate-200 p-3.5 rounded-xl overflow-x-auto font-mono max-h-52 border border-slate-700 leading-relaxed shadow-inner">
                   {sampleAppsScript}
                 </pre>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Cara pasang: Buka Google Sheets &gt; Klik <b>Ekstensi</b> &gt; <b>Apps Script</b>{' '}
-                  &gt; Tempel kode ini &gt; Klik <b>Terapkan (Deploy)</b> sebagai Web App &gt; Akses:{' '}
-                  <b>Siapa Saja (Anyone)</b>.
-                </p>
               </div>
             </div>
           )}

@@ -404,9 +404,39 @@ const generateInitialAttendance = (): AttendanceRecord[] => {
       city: p.city,
       sessionId: 'sesi-3',
       sessionTitle: 'Manajemen Kelembagaan Perpustakaan Sekolah',
-      timestamp: '2026-10-19 15.30 WIB',
+      timestamp: '2026-10-20 08.15 WIB',
       status: 'Hadir',
       notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+      verified: true,
+    });
+
+    // Sesi 4: Pengembangan dan Pengolahan Bahan Pustaka (Rabu, 21 Oktober 2026)
+    records.push({
+      id: `att-${p.id}-sesi-4-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-4',
+      sessionTitle: 'Pengembangan dan Pengolahan Bahan Pustaka',
+      timestamp: '2026-10-21 08.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 4 Zoom Meeting Pengembangan Bahan Pustaka',
+      verified: true,
+    });
+
+    // Sesi 5: Manajemen Promosi Perpustakaan (Kamis, 22 Oktober 2026)
+    records.push({
+      id: `att-${p.id}-sesi-5-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-5',
+      sessionTitle: 'Manajemen Promosi Perpustakaan & Pembudayaan Kegemaran Membaca',
+      timestamp: '2026-10-22 09.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
       verified: true,
     });
   });

@@ -16,7 +16,9 @@ import {
   exportAllDataJSON,
   getAllLocalAttendanceToRecover,
   getAllLocalSubmissionsToRecover,
+  getSharedWebhookUrl,
 } from './utils/storage';
+import { INITIAL_ATTENDANCE } from './data/diklatData';
 import {
   SpreadsheetConfig,
   getSavedSpreadsheetConfig,
@@ -195,9 +197,10 @@ export default function App() {
       showToast(`Presensi ${newRecord.participantName} berhasil tersimpan ke database pusat.`);
     }
 
-    // Forward to Webhook if configured directly on client as well
-    if (spreadsheetConfig?.webhookUrl) {
-      forwardToAppsScriptWebhook(spreadsheetConfig.webhookUrl, 'presensi', newRecord);
+    // Forward to Webhook if configured directly on client as well (works on Vercel without server)
+    const effectiveWebhookUrl = spreadsheetConfig?.webhookUrl || getSharedWebhookUrl();
+    if (effectiveWebhookUrl) {
+      forwardToAppsScriptWebhook(effectiveWebhookUrl, 'presensi', newRecord);
     }
   };
 
@@ -247,9 +250,10 @@ export default function App() {
       showToast(`Tugas ${newSub.title} berhasil disimpan.`);
     }
 
-    // Forward to Webhook if configured
-    if (spreadsheetConfig?.webhookUrl) {
-      forwardToAppsScriptWebhook(spreadsheetConfig.webhookUrl, 'tugas', newSub);
+    // Forward to Webhook if configured (works directly from browser on Vercel)
+    const effectiveWebhookUrl = spreadsheetConfig?.webhookUrl || getSharedWebhookUrl();
+    if (effectiveWebhookUrl) {
+      forwardToAppsScriptWebhook(effectiveWebhookUrl, 'tugas', newSub);
     }
   };
 
@@ -269,20 +273,25 @@ export default function App() {
     showToast(`Penilaian tugas untuk ${updatedSub.participantName} berhasil disimpan.`);
   };
 
-  // Handler: Recover / Mass Mark Attendance for Sesi 1, 2 & 3
+  // Handler: Recover / Mass Mark Attendance for Sesi 1 s.d 5 (270 records, including 21 & 22 Okt)
   const handleRestoreSession1And2 = async () => {
     try {
-      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2', 'sesi-3']);
-      if (res && res.attendance) {
+      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2', 'sesi-3', 'sesi-4', 'sesi-5']);
+      if (res && res.attendance && res.attendance.length > 0) {
         setAttendance(res.attendance);
         saveAttendance(res.attendance);
-        showToast(`Alhamdulillah! Seluruh ${participants.length} peserta berhasil ditandai Hadir pada Sesi 1, 2 & 3 di database pusat.`);
-      } else {
-        showToast(`Presensi Sesi 1, 2 & 3 sudah tercatat lengkap untuk seluruh ${participants.length} peserta.`);
+        showToast(`Alhamdulillah! Seluruh ${participants.length} peserta berhasil ditandai Hadir pada Sesi 1 s.d 5 (270 data, termasuk 21 & 22 Okt) di database pusat.`);
+        return;
       }
     } catch (err: any) {
-      showToast('Gagal memulihkan presensi: ' + err.message);
+      console.warn('Server mass attendance fallback:', err);
     }
+
+    // Local fallback for static Vercel deployments
+    const fullAttendance = [...INITIAL_ATTENDANCE];
+    setAttendance(fullAttendance);
+    saveAttendance(fullAttendance);
+    showToast(`Alhamdulillah! 270 data presensi lengkap Sesi 1 s.d 5 (${participants.length} peserta x 5 sesi, termasuk 21 & 22 Okt) berhasil dimuat!`);
   };
 
   // Handler: Manually sync local storage on this device to server
@@ -361,9 +370,9 @@ export default function App() {
               <button
                 onClick={handleRestoreSession1And2}
                 className="hover:underline flex items-center gap-1 font-bold text-emerald-100 bg-emerald-800/80 px-2.5 py-0.5 rounded text-[11px]"
-                title="Tandai Hadir seluruh peserta untuk Sesi 1, 2, dan 3 di server"
+                title="Tandai Hadir seluruh peserta untuk Sesi 1 s.d 5 (termasuk 21 & 22 Oktober - 270 Data)"
               >
-                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1, 2 &amp; 3 ({participants.length} Peserta)
+                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1 s.d 5 (270 Data, 21 &amp; 22 Okt)
               </button>
               <button
                 onClick={handleBackupJSON}
@@ -447,6 +456,7 @@ export default function App() {
             participants={participants}
             attendance={attendance}
             submissions={submissions}
+            isAdminMode={isAdminMode}
             onNavigate={(tab) => {
               setActiveTab(tab);
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -485,19 +495,31 @@ export default function App() {
         )}
 
         {activeTab === 'rekap' && (
-          <RecapSection
-            participants={participants}
-            attendance={attendance}
-            submissions={submissions}
-            onOpenParticipantModal={(p) => setSelectedParticipantModal(p)}
-            onOpenPrintReport={() => setIsPrintReportOpen(true)}
-            onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
-            spreadsheetConfig={spreadsheetConfig}
-            onNavigate={(tab) => {
-              setActiveTab(tab);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          isAdminMode ? (
+            <RecapSection
+              participants={participants}
+              attendance={attendance}
+              submissions={submissions}
+              onOpenParticipantModal={(p) => setSelectedParticipantModal(p)}
+              onOpenPrintReport={() => setIsPrintReportOpen(true)}
+              onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+              spreadsheetConfig={spreadsheetConfig}
+              onNavigate={(tab) => {
+                setActiveTab(tab);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          ) : (
+            <CheckMandiriSection
+              participants={participants}
+              attendance={attendance}
+              submissions={submissions}
+              onNavigate={(tab) => {
+                setActiveTab(tab);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          )
         )}
 
         {activeTab === 'cek-mandiri' && (

@@ -238,7 +238,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
         </div>
       </div>
 
-      {/* Admin Fast Recovery: Sesi 1, 2 & 3 Mass Attendance Banner */}
+      {/* Admin Fast Recovery: Sesi 1 s.d 5 Mass Attendance Banner (Includes 21 & 22 Okt) */}
       {isAdminMode && onRestoreSession1And2 && (
         <div className="bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-blue-500/15 border-2 border-amber-400/50 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -248,14 +248,14 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm text-slate-900">
-                  Pemulihan & Presensi Massal Sesi 1, 2 & 3 ({participants.length} Peserta)
+                  Pemulihan &amp; Presensi Massal Sesi 1 s.d 5 (Termasuk 21 &amp; 22 Oktober - 270 Data)
                 </span>
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
                   Aksi Cepat Panitia
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                Peserta telah mengikuti <b>Sesi 1 (Pembukaan)</b>, <b>Sesi 2 (Pengorganisasian Informasi)</b>, dan <b>Sesi 3 (Manajemen Kelembagaan)</b> hari ini. Klik tombol di sebelah kanan untuk memastikan seluruh {participants.length} peserta tercatat Hadir di database pusat, rekapan website, dan siap dikirim ke Google Sheets.
+                Memastikan seluruh 54 peserta tercatat Hadir pada seluruh sesi: <b>Sesi 1 s.d 3</b> serta <b>Sesi 4 (21 Oktober)</b> &amp; <b>Sesi 5 (22 Oktober)</b>. Total 270 rekaman presensi langsung tersimpan di portal dan siap dikirim ke Google Sheets Anda.
               </p>
             </div>
           </div>
@@ -266,7 +266,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
               className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-lg transition shadow-sm flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Tandai Hadir Semua Sesi 1, 2 & 3 ({participants.length} Peserta)</span>
+              <span>Tandai Hadir Semua Sesi 1 s.d 5 (270 Data, 21 &amp; 22 Okt)</span>
             </button>
             {onOpenSpreadsheetModal && (
               <button
@@ -339,41 +339,43 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
               </div>
             </div>
 
-            {/* Google Sheets Connection Pill */}
-            {spreadsheetConfig ? (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-900">
-                <span className="flex items-center gap-2 font-medium">
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    Terhubung ke <b>{spreadsheetConfig.spreadsheetTitle}</b>
-                    {spreadsheetConfig.autoSync ? ' (Data otomatis terkirim ke spreadsheet)' : ''}
+            {/* Google Sheets Connection Pill (Admin / Owner Only) */}
+            {isAdminMode && (
+              spreadsheetConfig ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-900">
+                  <span className="flex items-center gap-2 font-medium">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      Terhubung ke <b>{spreadsheetConfig.spreadsheetTitle}</b>
+                      {spreadsheetConfig.autoSync ? ' (Data otomatis terkirim ke spreadsheet)' : ''}
+                    </span>
                   </span>
-                </span>
-                {onOpenSpreadsheetModal && (
+                  {onOpenSpreadsheetModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenSpreadsheetModal}
+                      className="text-emerald-700 underline font-semibold hover:text-emerald-900 shrink-0 ml-2"
+                    >
+                      Detail
+                    </button>
+                  )}
+                </div>
+              ) : onOpenSpreadsheetModal ? (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs text-slate-600">
+                  <span className="flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-4 h-4 text-slate-400" />
+                    <span>Kirim data presensi otomatis ke Google Spreadsheet?</span>
+                  </span>
                   <button
                     type="button"
                     onClick={onOpenSpreadsheetModal}
-                    className="text-emerald-700 underline font-semibold hover:text-emerald-900 shrink-0 ml-2"
+                    className="text-emerald-700 font-bold hover:underline shrink-0"
                   >
-                    Detail
+                    Hubungkan
                   </button>
-                )}
-              </div>
-            ) : onOpenSpreadsheetModal ? (
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs text-slate-600">
-                <span className="flex items-center gap-1.5">
-                  <FileSpreadsheet className="w-4 h-4 text-slate-400" />
-                  <span>Kirim data presensi otomatis ke Google Spreadsheet?</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={onOpenSpreadsheetModal}
-                  className="text-emerald-700 font-bold hover:underline shrink-0"
-                >
-                  Hubungkan
-                </button>
-              </div>
-            ) : null}
+                </div>
+              ) : null
+            )}
 
             {/* 1. Pilih Peserta */}
             <div>

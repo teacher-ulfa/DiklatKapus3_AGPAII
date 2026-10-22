@@ -581,8 +581,11 @@ export const syncAllDataToGoogleSheet = async (
   };
 };
 
+import { INITIAL_PARTICIPANTS } from '../data/participants';
+
 /**
- * Optional Webhook Forwarder (Google Apps Script Web App)
+ * Robust Webhook Forwarder (Google Apps Script Web App)
+ * Directly sends from client browser to Google Sheets - works seamlessly on Vercel, GitHub, mobile & desktop
  */
 export const forwardToAppsScriptWebhook = async (
   webhookUrl: string,
@@ -590,6 +593,42 @@ export const forwardToAppsScriptWebhook = async (
   payload: any
 ): Promise<boolean> => {
   try {
+    if (!webhookUrl || webhookUrl.includes('docs.google.com/spreadsheets')) return false;
+
+    const participant = INITIAL_PARTICIPANTS.find((p) => p.id === payload.participantId);
+    const session = DIKLAT_SESSIONS.find((s) => s.id === payload.sessionId);
+    const task = DIKLAT_TASKS.find((t) => t.id === payload.taskId);
+
+    let enriched: any = { ...payload };
+    if (type === 'presensi') {
+      enriched = {
+        ...payload,
+        participantNo: participant?.no || payload.participantId,
+        participantName: payload.participantName || participant?.name,
+        institution: payload.institution || participant?.institution,
+        city: participant?.city || payload.city || '',
+        sessionDate: session?.date || payload.sessionDate || '21 Oktober 2026',
+        sessionCode: session?.code || payload.sessionId,
+        sessionTitle: session?.title || payload.sessionTitle,
+        hasPhoto: payload.photoProof ? 'Ada Foto Bukti' : '-',
+        hasSignature: payload.signature ? 'Bertandatangan Digital' : '-',
+      };
+    } else if (type === 'tugas') {
+      enriched = {
+        ...payload,
+        participantNo: participant?.no || payload.participantId,
+        participantName: payload.participantName || participant?.name,
+        institution: payload.institution || participant?.institution,
+        city: participant?.city || '',
+        taskCode: task?.code || payload.taskId,
+        taskTitle: task?.title || payload.taskTitle,
+        fileUrl: payload.fileUrl || payload.docLink || '-',
+        notes: payload.notes || '-',
+        status: payload.status || 'Belum Dinilai',
+        score: payload.score !== undefined ? payload.score : '-',
+      };
+    }
+
     await fetch(webhookUrl, {
       method: 'POST',
       mode: 'no-cors',
@@ -598,13 +637,87 @@ export const forwardToAppsScriptWebhook = async (
       },
       body: JSON.stringify({
         type,
-        data: payload,
+        data: enriched,
         timestamp: new Date().toISOString(),
       }),
     });
+    console.log(`[Client Webhook] Berhasil kirim ${type} peserta #${enriched.participantNo} (${enriched.participantName}) ke spreadsheet.`);
     return true;
   } catch (err) {
     console.warn('Webhook delivery warning:', err);
     return false;
   }
 };
+
+/**
+ * Direct Client-Side Batch Sync to Google Apps Script Webhook
+ * Works directly from browser on Vercel, Netlify, or local without backend server
+ */
+export const syncAllToAppsScriptDirectly = async (
+  webhookUrl: string,
+  attendance: AttendanceRecord[],
+  submissions: TaskSubmission[]
+): Promise<{ success: boolean; sentCount: number; sentTugasCount: number }> => {
+  if (!webhookUrl || webhookUrl.includes('docs.google.com/spreadsheets')) {
+    throw new Error('URL Webhook tidak valid atau masih berupa tautan file spreadsheet biasa.');
+  }
+
+  const enrichedPresensi = attendance.map((rec) => {
+    const p = INITIAL_PARTICIPANTS.find((x) => x.id === rec.participantId);
+    const s = DIKLAT_SESSIONS.find((x) => x.id === rec.sessionId);
+    return {
+      timestamp: rec.timestamp,
+      sessionDate: s?.date || '21 Oktober 2026',
+      participantNo: p?.no || rec.participantId,
+      participantName: rec.participantName || p?.name,
+      institution: rec.institution || p?.institution,
+      city: p?.city || '',
+      sessionCode: s?.code || rec.sessionId,
+      sessionTitle: rec.sessionTitle || s?.title,
+      status: rec.status || 'Hadir',
+      notes: rec.notes || '-',
+      hasPhoto: rec.photoProof ? 'Ada Foto Bukti' : '-',
+      hasSignature: rec.signature ? 'Bertandatangan Digital' : '-',
+    };
+  });
+
+  const enrichedTugas = submissions.map((sub) => {
+    const p = INITIAL_PARTICIPANTS.find((x) => x.id === sub.participantId);
+    const t = DIKLAT_TASKS.find((x) => x.id === sub.taskId);
+    return {
+      submittedAt: sub.submittedAt,
+      participantNo: p?.no || sub.participantId,
+      participantName: sub.participantName || p?.name,
+      institution: sub.institution || p?.institution,
+      city: p?.city || '',
+      taskCode: t?.code || sub.taskId,
+      taskTitle: sub.taskTitle || t?.title,
+      title: sub.title || '-',
+      fileUrl: sub.fileUrl || '-',
+      notes: sub.notes || '-',
+      score: sub.score !== undefined ? sub.score : '-',
+      status: sub.status || 'Belum Dinilai',
+    };
+  });
+
+  await fetch(webhookUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'batch_all',
+      presensi: enrichedPresensi,
+      tugas: enrichedTugas,
+      timestamp: new Date().toISOString(),
+    }),
+  });
+
+  return {
+    success: true,
+    sentCount: enrichedPresensi.length,
+    sentTugasCount: enrichedTugas.length,
+  };
+};
+

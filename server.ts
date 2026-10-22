@@ -3,7 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { INITIAL_PARTICIPANTS } from './src/data/participants';
-import { DIKLAT_SESSIONS } from './src/data/diklatData';
+import { DIKLAT_SESSIONS, DIKLAT_TASKS } from './src/data/diklatData';
 import { AttendanceRecord, TaskSubmission } from './src/types';
 import { SpreadsheetConfig } from './src/services/googleSheets';
 
@@ -54,7 +54,7 @@ function generateSeedAttendanceForSessions(): AttendanceRecord[] {
       verified: true,
     });
 
-    // Sesi 3
+    // Sesi 3: Manajemen Kelembagaan
     records.push({
       id: `att-${p.id}-sesi-3-seed`,
       participantId: p.id,
@@ -63,9 +63,39 @@ function generateSeedAttendanceForSessions(): AttendanceRecord[] {
       city: p.city,
       sessionId: 'sesi-3',
       sessionTitle: session3?.title || 'Manajemen Kelembagaan Perpustakaan Sekolah',
-      timestamp: '2026-10-19 15.30 WIB',
+      timestamp: '2026-10-20 08.15 WIB',
       status: 'Hadir',
       notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+      verified: true,
+    });
+
+    // Sesi 4: Pengembangan dan Pengolahan Bahan Pustaka (21 Okt 2026)
+    records.push({
+      id: `att-${p.id}-sesi-4-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-4',
+      sessionTitle: DIKLAT_SESSIONS[3]?.title || 'Pengembangan dan Pengolahan Bahan Pustaka',
+      timestamp: '2026-10-21 08.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 4 Zoom Meeting Pengembangan Bahan Pustaka',
+      verified: true,
+    });
+
+    // Sesi 5: Manajemen Promosi Perpustakaan (22 Okt 2026)
+    records.push({
+      id: `att-${p.id}-sesi-5-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-5',
+      sessionTitle: DIKLAT_SESSIONS[4]?.title || 'Manajemen Promosi Perpustakaan & Pembudayaan Kegemaran Membaca',
+      timestamp: '2026-10-22 09.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
       verified: true,
     });
   });
@@ -85,11 +115,13 @@ function loadStore(): StoreData {
       if (!data.attendance) {
         data.attendance = [];
       }
-      // Ensure all participants in INITIAL_PARTICIPANTS have Sesi 1, 2, and 3 seeded
+      // Ensure all participants in INITIAL_PARTICIPANTS have Sesi 1 s.d 5 seeded
       let hasNewSeed = false;
       const s1 = DIKLAT_SESSIONS[0];
       const s2 = DIKLAT_SESSIONS[1];
       const s3 = DIKLAT_SESSIONS[2];
+      const s4 = DIKLAT_SESSIONS[3];
+      const s5 = DIKLAT_SESSIONS[4];
 
       INITIAL_PARTICIPANTS.forEach((p) => {
         // Sesi 1
@@ -147,9 +179,51 @@ function loadStore(): StoreData {
             city: p.city,
             sessionId: 'sesi-3',
             sessionTitle: s3?.title || 'Manajemen Kelembagaan Perpustakaan Sekolah',
-            timestamp: '2026-10-19 15.30 WIB',
+            timestamp: '2026-10-20 08.15 WIB',
             status: 'Hadir',
             notes: 'Hadir Sesi 3 Zoom Meeting Manajemen Kelembagaan',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
+
+        // Sesi 4 (21 Oktober 2026)
+        const hasS4 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-4'
+        );
+        if (!hasS4) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-4-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-4',
+            sessionTitle: s4?.title || 'Pengembangan dan Pengolahan Bahan Pustaka',
+            timestamp: '2026-10-21 08.15 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Sesi 4 Zoom Meeting Pengembangan Bahan Pustaka',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
+
+        // Sesi 5 (22 Oktober 2026)
+        const hasS5 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-5'
+        );
+        if (!hasS5) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-5-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-5',
+            sessionTitle: s5?.title || 'Manajemen Promosi Perpustakaan & Pembudayaan Kegemaran Membaca',
+            timestamp: '2026-10-22 09.15 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
             verified: true,
           });
           hasNewSeed = true;
@@ -195,33 +269,63 @@ function saveStore(data: StoreData): void {
 // In-memory cache
 let store: StoreData = loadStore();
 
-// Forwarder to Google Apps Script Webhook (matching Panitia 10-column layout)
+// Forwarder to Google Apps Script Webhook (matching Panitia layout & real-time sync)
 async function forwardWebhook(type: 'presensi' | 'tugas', payload: any) {
   if (!store.spreadsheetConfig?.webhookUrl) return;
   try {
     const webhookUrl = store.spreadsheetConfig.webhookUrl;
+    if (webhookUrl.includes('docs.google.com/spreadsheets')) {
+      console.warn('[Webhook Warning]: URL is a spreadsheet URL, not a web app URL');
+      return;
+    }
     const participant = INITIAL_PARTICIPANTS.find((p) => p.id === payload.participantId);
     const session = DIKLAT_SESSIONS.find((s) => s.id === payload.sessionId);
+    const task = DIKLAT_TASKS.find((t) => t.id === payload.taskId);
 
-    const enrichedPayload = {
-      ...payload,
-      participantNo: participant?.no || payload.participantId,
-      sessionDate: session?.date || '19 Oktober 2026',
-      sessionCode: session?.code || payload.sessionId,
-      sessionTitle: session?.title || payload.sessionTitle,
-    };
+    let enrichedPayload: any = { ...payload };
+
+    if (type === 'presensi') {
+      enrichedPayload = {
+        ...payload,
+        participantNo: participant?.no || payload.participantId,
+        participantName: payload.participantName || participant?.name,
+        institution: payload.institution || participant?.institution,
+        city: participant?.city || payload.city || '',
+        sessionDate: session?.date || payload.sessionDate || '19 Oktober 2026',
+        sessionCode: session?.code || payload.sessionId,
+        sessionTitle: session?.title || payload.sessionTitle,
+        hasPhoto: payload.photoProof ? 'Ada Foto Bukti' : '-',
+        hasSignature: payload.signature ? 'Bertandatangan Digital' : '-',
+      };
+    } else if (type === 'tugas') {
+      enrichedPayload = {
+        ...payload,
+        participantNo: participant?.no || payload.participantId,
+        participantName: payload.participantName || participant?.name,
+        institution: payload.institution || participant?.institution,
+        city: participant?.city || '',
+        taskCode: task?.code || payload.taskId,
+        taskTitle: task?.title || payload.taskTitle,
+        fileUrl: payload.fileUrl || payload.docLink || '-',
+        notes: payload.notes || '-',
+        status: payload.status || 'Belum Dinilai',
+        score: payload.score !== undefined ? payload.score : '-',
+      };
+    }
 
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      redirect: 'follow',
       body: JSON.stringify({
         type,
         data: enrichedPayload,
         timestamp: new Date().toISOString(),
       }),
     });
+    console.log(`[Webhook Real-Time] Sukses kirim ${type} peserta #${enrichedPayload.participantNo} (${enrichedPayload.participantName}) ke spreadsheet.`);
   } catch (err) {
-    console.warn('Backend Webhook forward warning:', err);
+    console.warn('[Webhook Real-Time Warning]:', err);
   }
 }
 
@@ -424,7 +528,7 @@ async function startServer() {
     }
   });
 
-  // 9. Batch push all attendance records to Google Apps Script Webhook
+  // 9. Batch push all attendance & submission records to Google Apps Script Webhook
   app.post('/api/webhook/sync-all', async (req: Request, res: Response) => {
     try {
       const webhookUrl = req.body.webhookUrl || store.spreadsheetConfig?.webhookUrl;
@@ -432,27 +536,85 @@ async function startServer() {
         return res.status(400).json({ error: 'Alamat Webhook URL belum diisi' });
       }
 
+      if (webhookUrl.includes('docs.google.com/spreadsheets')) {
+        return res.status(400).json({
+          error: 'Tautan yang dimasukkan adalah tautan file Spreadsheet (docs.google.com/spreadsheets), BUKAN tautan Web App Apps Script (script.google.com/macros/s/.../exec). Silakan deploy Web App di Apps Script terlebih dahulu atau gunakan Metode 1 (Salin Cepat TSV).',
+        });
+      }
+
+      // Prepare enriched presensi records
+      const presensiList = store.attendance.map((rec) => {
+        const participant = INITIAL_PARTICIPANTS.find((p) => p.id === rec.participantId);
+        const session = DIKLAT_SESSIONS.find((s) => s.id === rec.sessionId);
+        return {
+          ...rec,
+          participantNo: participant?.no || rec.participantId,
+          participantName: rec.participantName || participant?.name,
+          institution: rec.institution || participant?.institution,
+          city: rec.city || participant?.city || '',
+          sessionDate: session?.date || '19 Oktober 2026',
+          sessionCode: session?.code || rec.sessionId,
+          sessionTitle: session?.title || rec.sessionTitle,
+          hasPhoto: rec.photoProof ? 'Ada Foto Bukti' : '-',
+          hasSignature: rec.signature ? 'Bertandatangan Digital' : '-',
+        };
+      });
+
+      // Prepare enriched tugas records
+      const tugasList = store.submissions.map((sub) => {
+        const participant = INITIAL_PARTICIPANTS.find((p) => p.id === sub.participantId);
+        const task = DIKLAT_TASKS.find((t) => t.id === sub.taskId);
+        return {
+          ...sub,
+          participantNo: participant?.no || sub.participantId,
+          participantName: sub.participantName || participant?.name,
+          institution: sub.institution || participant?.institution,
+          city: participant?.city || '',
+          taskCode: task?.code || sub.taskId,
+          taskTitle: task?.title || sub.taskTitle,
+          fileUrl: sub.fileUrl || sub.docLink || '-',
+        };
+      });
+
+      // Try bulk push first (fastest, atomic)
+      try {
+        const bulkRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          body: JSON.stringify({
+            type: 'batch_all',
+            presensi: presensiList,
+            tugas: tugasList,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        if (bulkRes.ok) {
+          return res.json({
+            success: true,
+            sentCount: presensiList.length,
+            sentTugasCount: tugasList.length,
+            mode: 'bulk',
+          });
+        }
+      } catch (err) {
+        console.warn('Bulk push failed, trying sequential fallback...', err);
+      }
+
+      // Fallback: sequential single rows
       let sentCount = 0;
       let failedCount = 0;
 
-      for (const rec of store.attendance) {
+      for (const rec of presensiList) {
         try {
-          const participant = INITIAL_PARTICIPANTS.find((p) => p.id === rec.participantId);
-          const session = DIKLAT_SESSIONS.find((s) => s.id === rec.sessionId);
-          const enriched = {
-            ...rec,
-            participantNo: participant?.no || rec.participantId,
-            sessionDate: session?.date || '19 Oktober 2026',
-            sessionCode: session?.code || rec.sessionId,
-            sessionTitle: session?.title || rec.sessionTitle,
-          };
-
           await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            redirect: 'follow',
             body: JSON.stringify({
               type: 'presensi',
-              data: enriched,
+              data: rec,
               timestamp: new Date().toISOString(),
             }),
           });
@@ -466,7 +628,45 @@ async function startServer() {
         success: true,
         sentCount,
         failedCount,
-        total: store.attendance.length,
+        total: presensiList.length,
+        mode: 'sequential',
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 10. Test ping to Google Apps Script Webhook
+  app.post('/api/webhook/test', async (req: Request, res: Response) => {
+    try {
+      const webhookUrl = req.body.webhookUrl || store.spreadsheetConfig?.webhookUrl;
+      if (!webhookUrl) {
+        return res.status(400).json({ error: 'URL Webhook belum diisi' });
+      }
+
+      if (webhookUrl.includes('docs.google.com/spreadsheets')) {
+        return res.status(400).json({
+          error: 'Tautan yang dimasukkan adalah tautan file Spreadsheet (docs.google.com/spreadsheets), BUKAN tautan Web App Apps Script (script.google.com/macros/s/.../exec). Silakan deploy Web App di Apps Script terlebih dahulu.',
+        });
+      }
+
+      const pingPayload = {
+        type: 'test_ping',
+        message: 'Tes koneksi sistem diklat AGPAII Jatim & UIN SATU Tulungagung',
+        timestamp: new Date().toISOString(),
+      };
+
+      const resp = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
+        body: JSON.stringify(pingPayload),
+      });
+
+      res.json({
+        success: resp.ok,
+        status: resp.status,
+        statusText: resp.statusText,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
