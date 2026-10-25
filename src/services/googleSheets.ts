@@ -1,5 +1,6 @@
 import { Participant, AttendanceRecord, TaskSubmission } from '../types';
 import { DIKLAT_INFO, DIKLAT_SESSIONS, DIKLAT_TASKS } from '../data/diklatData';
+import { INITIAL_PARTICIPANTS } from '../data/participants';
 
 export interface SpreadsheetConfig {
   spreadsheetId: string;
@@ -496,15 +497,18 @@ export const syncAllDataToGoogleSheet = async (
   // 5. Prepare Panitia 10-Column Rows:
   // Time stemp, Tanggal, No Pesesrta, Nama, Instansi, Kab/Ko, Sesi-1, Materi, Kehadiran, Catatan
   const panitia10ColRows: (string | number)[][] = [];
+  const coveredAttIds = new Set<string>();
+
   participants.forEach((p) => {
     DIKLAT_SESSIONS.forEach((s) => {
       const att = attendanceList.find(
         (a) => a.participantId === p.id && a.sessionId === s.id
       );
       if (att) {
+        coveredAttIds.add(att.id);
         panitia10ColRows.push([
           att.timestamp || '2026-10-19 08:15:00 WIB',
-          s.date || '19 Oktober 2026',
+          (att as any).sessionDate || s.date || '19 Oktober 2026',
           p.no,
           p.name,
           p.institution,
@@ -518,36 +522,82 @@ export const syncAllDataToGoogleSheet = async (
     });
   });
 
-  const { sheetTitles, firstSheetTitle } = await ensureWorkbookSheets(accessToken, spreadsheetId).catch(() => ({
-    sheetTitles: ['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'],
-    firstSheetTitle: 'Sheet1',
-  }));
+  // Catch any remaining attendance records not matched in the matrix
+  attendanceList.forEach((att) => {
+    if (!coveredAttIds.has(att.id)) {
+      const p = participants.find((x) => x.id === att.participantId);
+      const s = DIKLAT_SESSIONS.find((x) => x.id === att.sessionId);
+      panitia10ColRows.push([
+        att.timestamp || '2026-10-19 08:15:00 WIB',
+        (att as any).sessionDate || s?.date || '19 Oktober 2026',
+        p?.no || att.participantId,
+        att.participantName,
+        att.institution,
+        att.city,
+        s?.code || att.sessionId,
+        att.sessionTitle,
+        att.status || 'Hadir',
+        att.notes || 'Hadir Zoom Meeting Diklat',
+      ]);
+    }
+  });
+
+  const panitia10Headers = [
+    'Time stemp',
+    'Tanggal',
+    'No Pesesrta',
+    'Nama',
+    'Instansi',
+    'Kab/Ko',
+    'Sesi-1',
+    'Materi',
+    'Kehadiran',
+    'Catatan',
+  ];
+
+  // Safely discover actual existing sheets in user's workbook
+  let existingSheets: string[] = [];
+  let firstSheetTitle = 'Sheet1';
+  try {
+    const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (metaRes.ok) {
+      const meta = await metaRes.json();
+      existingSheets = meta.sheets?.map((s: any) => s.properties?.title) || [];
+      if (existingSheets.length > 0) {
+        firstSheetTitle = existingSheets[0];
+      }
+    }
+  } catch (err) {
+    console.warn('Could not inspect sheet metadata:', err);
+  }
 
   const data: any[] = [];
 
-  // If first sheet is not one of the standard tabs, populate it with Panitia's 10-column format
-  if (firstSheetTitle && !['Presensi Diklat', 'Pengumpulan Tugas', 'Rekapitulasi Nilai Peserta'].includes(firstSheetTitle)) {
-    data.push({
-      range: `'${firstSheetTitle}'!A2:J${Math.max(panitia10ColRows.length + 1, 100)}`,
-      values: panitia10ColRows.length > 0 ? panitia10ColRows : [['-']],
-    });
-  }
+  // Always write panitia's 10-column data (with headers at row 1) to the primary sheet!
+  const allRowsWithHeader = [panitia10Headers, ...panitia10ColRows];
+  data.push({
+    range: `'${firstSheetTitle}'!A1:J${allRowsWithHeader.length}`,
+    values: allRowsWithHeader,
+  });
 
-  if (sheetTitles.includes('Presensi Diklat')) {
+  // Only update additional tabs if they ACTUALLY exist in the user's spreadsheet
+  if (existingSheets.includes('Presensi Diklat') && firstSheetTitle !== 'Presensi Diklat') {
     data.push({
       range: `'Presensi Diklat'!A2:M${Math.max(presensiRows.length + 1, 100)}`,
       values: presensiRows.length > 0 ? presensiRows : [['-']],
     });
   }
 
-  if (sheetTitles.includes('Pengumpulan Tugas')) {
+  if (existingSheets.includes('Pengumpulan Tugas') && firstSheetTitle !== 'Pengumpulan Tugas') {
     data.push({
       range: `'Pengumpulan Tugas'!A2:P${Math.max(tugasRows.length + 1, 100)}`,
       values: tugasRows.length > 0 ? tugasRows : [['-']],
     });
   }
 
-  if (sheetTitles.includes('Rekapitulasi Nilai Peserta')) {
+  if (existingSheets.includes('Rekapitulasi Nilai Peserta') && firstSheetTitle !== 'Rekapitulasi Nilai Peserta') {
     data.push({
       range: `'Rekapitulasi Nilai Peserta'!A2:J${Math.max(rekapRows.length + 1, 100)}`,
       values: rekapRows,
@@ -580,8 +630,6 @@ export const syncAllDataToGoogleSheet = async (
     totalTugas: tugasRows.length,
   };
 };
-
-import { INITIAL_PARTICIPANTS } from '../data/participants';
 
 /**
  * Robust Webhook Forwarder (Google Apps Script Web App)

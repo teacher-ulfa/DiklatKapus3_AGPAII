@@ -16,14 +16,14 @@ export const AdminGradingModal: React.FC<AdminGradingModalProps> = ({
   onSaveGrading,
   isAdminMode,
 }) => {
-  if (!submission) return null;
-
-  const [score, setScore] = useState<number | ''>(submission.score ?? 85);
-  const [status, setStatus] = useState<SubmissionStatus>(submission.status);
-  const [feedback, setFeedback] = useState<string>(submission.feedback ?? '');
+  const [score, setScore] = useState<number | ''>(submission?.score ?? 85);
+  const [status, setStatus] = useState<SubmissionStatus>(submission?.status || 'Belum Dinilai');
+  const [feedback, setFeedback] = useState<string>(submission?.feedback ?? '');
   const [reviewer, setReviewer] = useState<string>(
-    submission.reviewedBy || 'Dr. Ahmad Fahrudin, M.Pd.I. (Kepala UPT Perpustakaan UIN SATU)'
+    submission?.reviewedBy || 'Dr. Ahmad Fahrudin, M.Pd.I. (Kepala UPT Perpustakaan UIN SATU)'
   );
+
+  if (!submission) return null;
 
   const taskObj = DIKLAT_TASKS.find((t) => t.id === submission.taskId);
 

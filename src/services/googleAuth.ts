@@ -16,8 +16,11 @@ const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 provider.addScope('https://www.googleapis.com/auth/drive.file');
 
+const TOKEN_STORAGE_KEY = 'diklat_google_access_token_v4';
+
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null =
+  typeof window !== 'undefined' ? sessionStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -25,14 +28,18 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        cachedAccessToken = null;
-        if (onAuthFailure) onAuthFailure();
+      if (onAuthSuccess) {
+        onAuthSuccess(user, cachedAccessToken || '');
       }
     } else {
       cachedAccessToken = null;
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+        } catch {
+          // Ignore
+        }
+      }
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -48,6 +55,13 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, cachedAccessToken);
+      } catch {
+        // Ignore
+      }
+    }
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error) {
     console.error('Google Sign-In error:', error);
@@ -64,4 +78,11 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const logoutGoogle = async (): Promise<void> => {
   await signOut(auth);
   cachedAccessToken = null;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+  }
 };

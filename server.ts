@@ -98,6 +98,21 @@ function generateSeedAttendanceForSessions(): AttendanceRecord[] {
       notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
       verified: true,
     });
+
+    // Sesi 6: Pembangunan Organisasi Berbasis Moderasi dan Ekoteologi (23 Okt 2026)
+    records.push({
+      id: `att-${p.id}-sesi-6-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-6',
+      sessionTitle: DIKLAT_SESSIONS[5]?.title || 'Pembangunan Organisasi Berbasis Moderasi dan Ekoteologi',
+      timestamp: '2026-10-23 08.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 6 Zoom Meeting Moderasi Beragama & Ekoteologi',
+      verified: true,
+    });
   });
 
   return records;
@@ -122,6 +137,7 @@ function loadStore(): StoreData {
       const s3 = DIKLAT_SESSIONS[2];
       const s4 = DIKLAT_SESSIONS[3];
       const s5 = DIKLAT_SESSIONS[4];
+      const s6 = DIKLAT_SESSIONS[5];
 
       INITIAL_PARTICIPANTS.forEach((p) => {
         // Sesi 1
@@ -224,6 +240,27 @@ function loadStore(): StoreData {
             timestamp: '2026-10-22 09.15 WIB',
             status: 'Hadir',
             notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
+            verified: true,
+          });
+          hasNewSeed = true;
+        }
+
+        // Sesi 6 (23 Oktober 2026)
+        const hasS6 = data.attendance.some(
+          (a: any) => a.participantId === p.id && a.sessionId === 'sesi-6'
+        );
+        if (!hasS6) {
+          data.attendance.push({
+            id: `att-${p.id}-sesi-6-seed`,
+            participantId: p.id,
+            participantName: p.name,
+            institution: p.institution,
+            city: p.city,
+            sessionId: 'sesi-6',
+            sessionTitle: s6?.title || 'Pembangunan Organisasi Berbasis Moderasi dan Ekoteologi',
+            timestamp: '2026-10-23 08.15 WIB',
+            status: 'Hadir',
+            notes: 'Hadir Sesi 6 Zoom Meeting Moderasi Beragama & Ekoteologi',
             verified: true,
           });
           hasNewSeed = true;

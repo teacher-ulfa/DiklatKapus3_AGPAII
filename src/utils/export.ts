@@ -199,6 +199,7 @@ export const generatePanitiaExactSpreadsheetCSV = (
   };
 
   const rows: string[] = [];
+  const coveredAttIds = new Set<string>();
 
   // Sort attendance chronologically or by participant
   participants.forEach((p) => {
@@ -207,10 +208,11 @@ export const generatePanitiaExactSpreadsheetCSV = (
         (a) => a.participantId === p.id && a.sessionId === s.id
       );
       if (att) {
+        coveredAttIds.add(att.id);
         rows.push(
           [
             att.timestamp || '2026-10-19 08:15:00 WIB',
-            s.date || '19 Oktober 2026',
+            (att as any).sessionDate || s.date || '19 Oktober 2026',
             p.no,
             p.name,
             p.institution,
@@ -227,6 +229,30 @@ export const generatePanitiaExactSpreadsheetCSV = (
     });
   });
 
+  // Include any extra attendance records
+  attendanceList.forEach((att) => {
+    if (!coveredAttIds.has(att.id)) {
+      const p = participants.find((x) => x.id === att.participantId);
+      const s = sessions.find((x) => x.id === att.sessionId);
+      rows.push(
+        [
+          att.timestamp || '2026-10-19 08:15:00 WIB',
+          (att as any).sessionDate || s?.date || '19 Oktober 2026',
+          p?.no || att.participantId,
+          att.participantName,
+          att.institution,
+          att.city,
+          s?.code || att.sessionId,
+          att.sessionTitle,
+          att.status || 'Hadir',
+          att.notes || 'Hadir Zoom Meeting Diklat',
+        ]
+          .map(escapeCSV)
+          .join(delimiter)
+      );
+    }
+  });
+
   return [headers.map(escapeCSV).join(delimiter), ...rows].join('\r\n');
 };
 
@@ -239,16 +265,19 @@ export const generatePanitiaClipboardTSV = (
   attendanceList: AttendanceRecord[]
 ): string => {
   const rows: string[] = [];
+  const coveredAttIds = new Set<string>();
+
   participants.forEach((p) => {
     sessions.forEach((s) => {
       const att = attendanceList.find(
         (a) => a.participantId === p.id && a.sessionId === s.id
       );
       if (att) {
+        coveredAttIds.add(att.id);
         rows.push(
           [
             att.timestamp || '2026-10-19 08:15:00 WIB',
-            s.date || '19 Oktober 2026',
+            (att as any).sessionDate || s.date || '19 Oktober 2026',
             p.no,
             p.name,
             p.institution,
@@ -262,6 +291,30 @@ export const generatePanitiaClipboardTSV = (
       }
     });
   });
+
+  // Include any extra attendance records
+  attendanceList.forEach((att) => {
+    if (!coveredAttIds.has(att.id)) {
+      const p = participants.find((x) => x.id === att.participantId);
+      const s = sessions.find((x) => x.id === att.sessionId);
+      rows.push(
+        [
+          att.timestamp || '2026-10-19 08:15:00 WIB',
+          (att as any).sessionDate || s?.date || '19 Oktober 2026',
+          p?.no || att.participantId,
+          att.participantName,
+          att.institution,
+          att.city,
+          s?.code || att.sessionId,
+          att.sessionTitle,
+          att.status || 'Hadir',
+          att.notes || 'Hadir Zoom Meeting Diklat',
+        ].join('\t')
+      );
+    }
+  });
+
   return rows.join('\n');
 };
+
 

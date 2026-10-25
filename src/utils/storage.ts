@@ -120,18 +120,20 @@ export const getStoredAttendance = (): AttendanceRecord[] => {
         const hasSesi3 = parsed.some((a) => a.sessionId === 'sesi-3');
         const hasSesi4 = parsed.some((a) => a.sessionId === 'sesi-4');
         const hasSesi5 = parsed.some((a) => a.sessionId === 'sesi-5');
+        const hasSesi6 = parsed.some((a) => a.sessionId === 'sesi-6');
         const hasAllSeeds =
           hasSesi1 &&
           hasSesi2 &&
           hasSesi3 &&
           hasSesi4 &&
           hasSesi5 &&
+          hasSesi6 &&
           parsed.length >= INITIAL_ATTENDANCE.length;
         if (hasAllSeeds) {
           return parsed;
         }
 
-        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost and Sesi 1 s.d 5 are complete
+        // Merge with INITIAL_ATTENDANCE so user manual presensi is not lost and Sesi 1 s.d 6 are complete
         const merged = [...parsed];
         INITIAL_ATTENDANCE.forEach((seed) => {
           const exists = merged.some(
@@ -195,10 +197,31 @@ export const saveSubmissions = (submissions: TaskSubmission[]): void => {
   }
 };
 
+export const getStoredAdminMode = (): boolean => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.ADMIN_MODE) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const saveStoredAdminMode = (isAdmin: boolean): void => {
+  try {
+    if (isAdmin) {
+      localStorage.setItem(STORAGE_KEYS.ADMIN_MODE, 'true');
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_MODE);
+    }
+  } catch (err) {
+    console.error('Failed to save admin mode to localStorage', err);
+  }
+};
+
 export const resetAllData = (): void => {
   localStorage.removeItem(STORAGE_KEYS.PARTICIPANTS);
   localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
   localStorage.removeItem(STORAGE_KEYS.SUBMISSIONS);
+  localStorage.removeItem(STORAGE_KEYS.ADMIN_MODE);
 };
 
 export const exportAllDataJSON = (): string => {
@@ -211,3 +234,4 @@ export const exportAllDataJSON = (): string => {
   };
   return JSON.stringify(payload, null, 2);
 };
+

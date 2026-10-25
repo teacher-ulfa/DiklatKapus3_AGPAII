@@ -221,11 +221,11 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
               </span>
               <span className="bg-emerald-400/20 text-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Hari Ke-1 Selesai (3 Sesi 100% Hadir)
+                Sesi 1 s.d 6 Lengkap (Termasuk 21, 22, &amp; 23 Okt)
               </span>
             </div>
             <p className="text-xs text-emerald-200/90 leading-relaxed max-w-2xl">
-              <b>Alhamdulillah, seluruh {participants.length} peserta telah LENGKAP mengisi presensi pada 3 sesi hari ini (162 rekaman kehadiran tervalidasi):</b> Sesi 1 (Pembukaan), Sesi 2 (Pengorganisasian Informasi), dan Sesi 3 (Manajemen Kelembagaan). Kolom tagihan 8 tugas praktik (T1 s.d. T8) akan terisi otomatis seiring peserta mengunggah tugas sesuai jadwal pedoman (21 s.d. 29 Oktober 2026).
+              <b>Alhamdulillah, seluruh {participants.length} peserta telah LENGKAP mengisi presensi pada Sesi 1 s.d 6 ({attendance.length} rekaman kehadiran tervalidasi):</b> Sesi 1 (Pembukaan), Sesi 2 (Pengorganisasian Informasi), Sesi 3 (Manajemen Kelembagaan), Sesi 4 (Pengembangan Bahan Pustaka - 21 Okt), Sesi 5 (Promosi Perpustakaan - 22 Okt), dan Sesi 6 (Moderasi &amp; Ekoteologi - 23 Okt). Kolom tagihan 8 tugas praktik (T1 s.d. T8) akan terisi otomatis seiring peserta mengunggah tugas.
             </p>
           </div>
         </div>
@@ -295,7 +295,7 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Kehadiran Hari Ke-1 (S1-S3)
+            Kehadiran Sesi 1 s.d 6 (19-23 Okt)
           </div>
           <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">
             100%
@@ -310,7 +310,7 @@ export const RecapSection: React.FC<RecapSectionProps> = ({
           <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">
             {attendance.length} Data
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Sesi 1, 2, &amp; 3 Terdata Lengkap</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Sesi 1 s.d 6 (19-23 Okt) Terdata Lengkap</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

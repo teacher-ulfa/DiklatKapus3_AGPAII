@@ -17,6 +17,8 @@ import {
   getAllLocalAttendanceToRecover,
   getAllLocalSubmissionsToRecover,
   getSharedWebhookUrl,
+  getStoredAdminMode,
+  saveStoredAdminMode,
 } from './utils/storage';
 import { INITIAL_ATTENDANCE } from './data/diklatData';
 import {
@@ -57,8 +59,13 @@ export default function App() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => getStoredAdminMode());
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+
+  const updateAdminMode = (val: boolean) => {
+    setIsAdminMode(val);
+    saveStoredAdminMode(val);
+  };
 
   // Zoom Meeting Modal State
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
@@ -132,15 +139,15 @@ export default function App() {
     const unsubscribe = initAuth(
       (user, token) => {
         setCurrentUser(user);
-        setAccessToken(token);
+        if (token) setAccessToken(token);
         if (user.email?.toLowerCase().trim() === 'pembelajaranulfa@gmail.com') {
-          setIsAdminMode(true);
+          updateAdminMode(true);
         }
       },
       () => {
         setCurrentUser(null);
         setAccessToken(null);
-        setIsAdminMode(false);
+        // Do NOT reset isAdminMode here! Admin mode is persistent across reloads/sessions.
       }
     );
 
@@ -273,14 +280,14 @@ export default function App() {
     showToast(`Penilaian tugas untuk ${updatedSub.participantName} berhasil disimpan.`);
   };
 
-  // Handler: Recover / Mass Mark Attendance for Sesi 1 s.d 5 (270 records, including 21 & 22 Okt)
+  // Handler: Recover / Mass Mark Attendance for Sesi 1 s.d 6 (324 records, including 21, 22, & 23 Okt)
   const handleRestoreSession1And2 = async () => {
     try {
-      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2', 'sesi-3', 'sesi-4', 'sesi-5']);
+      const res = await triggerMassAttendanceSessionApi(['sesi-1', 'sesi-2', 'sesi-3', 'sesi-4', 'sesi-5', 'sesi-6']);
       if (res && res.attendance && res.attendance.length > 0) {
         setAttendance(res.attendance);
         saveAttendance(res.attendance);
-        showToast(`Alhamdulillah! Seluruh ${participants.length} peserta berhasil ditandai Hadir pada Sesi 1 s.d 5 (270 data, termasuk 21 & 22 Okt) di database pusat.`);
+        showToast(`Alhamdulillah! Seluruh ${participants.length} peserta berhasil ditandai Hadir pada Sesi 1 s.d 6 (324 data, termasuk 21, 22, & 23 Okt) di database pusat.`);
         return;
       }
     } catch (err: any) {
@@ -291,7 +298,7 @@ export default function App() {
     const fullAttendance = [...INITIAL_ATTENDANCE];
     setAttendance(fullAttendance);
     saveAttendance(fullAttendance);
-    showToast(`Alhamdulillah! 270 data presensi lengkap Sesi 1 s.d 5 (${participants.length} peserta x 5 sesi, termasuk 21 & 22 Okt) berhasil dimuat!`);
+    showToast(`Alhamdulillah! 324 data presensi lengkap Sesi 1 s.d 6 (${participants.length} peserta x 6 sesi, termasuk 21, 22, & 23 Okt) berhasil dimuat!`);
   };
 
   // Handler: Manually sync local storage on this device to server
@@ -370,9 +377,9 @@ export default function App() {
               <button
                 onClick={handleRestoreSession1And2}
                 className="hover:underline flex items-center gap-1 font-bold text-emerald-100 bg-emerald-800/80 px-2.5 py-0.5 rounded text-[11px]"
-                title="Tandai Hadir seluruh peserta untuk Sesi 1 s.d 5 (termasuk 21 & 22 Oktober - 270 Data)"
+                title="Tandai Hadir seluruh peserta untuk Sesi 1 s.d 6 (termasuk 21, 22, & 23 Oktober - 324 Data)"
               >
-                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1 s.d 5 (270 Data, 21 &amp; 22 Okt)
+                <Sparkles className="w-3 h-3 text-amber-300" /> Presensi Sesi 1 s.d 6 (324 Data, 21, 22, &amp; 23 Okt)
               </button>
               <button
                 onClick={handleBackupJSON}
@@ -388,7 +395,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  setIsAdminMode(false);
+                  updateAdminMode(false);
                   if (currentUser) {
                     logoutGoogle().catch(() => {});
                     setCurrentUser(null);
@@ -416,7 +423,7 @@ export default function App() {
         currentUser={currentUser}
         onToggleAdmin={async () => {
           if (isAdminMode || currentUser) {
-            setIsAdminMode(false);
+            updateAdminMode(false);
             if (currentUser) {
               logoutGoogle().catch(() => {});
               setCurrentUser(null);
@@ -424,24 +431,8 @@ export default function App() {
             }
             showToast('Berhasil keluar (Mode Publik Peserta)');
           } else {
-            try {
-              const res = await googleSignIn();
-              if (res) {
-                setCurrentUser(res.user);
-                setAccessToken(res.accessToken);
-                const isOwner = res.user.email?.toLowerCase().trim() === 'pembelajaranulfa@gmail.com';
-                if (isOwner) {
-                  setIsAdminMode(true);
-                  showToast('Selamat Datang Pemilik (pembelajaranulfa@gmail.com)! Akses Panitia Aktif.');
-                } else {
-                  setIsAdminMode(false);
-                  showToast(`Masuk sebagai ${res.user.displayName || res.user.email} (Mode Peserta)`);
-                }
-              }
-            } catch (err: any) {
-              console.warn('Google sign-in fallback:', err);
-              setIsPinModalOpen(true);
-            }
+            // Open verification modal with Google Sign-In & PIN (1926/2026) options
+            setIsPinModalOpen(true);
           }
         }}
         onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
@@ -555,50 +546,59 @@ export default function App() {
       )}
 
       {/* Google Sheets Synchronization Modal */}
-      <GoogleSheetsSyncModal
-        isOpen={isSpreadsheetModalOpen}
-        onClose={() => setIsSpreadsheetModalOpen(false)}
-        currentUser={currentUser}
-        accessToken={accessToken}
-        onAuthSuccess={(user, token) => {
-          setCurrentUser(user);
-          setAccessToken(token);
-        }}
-        onAuthLogout={() => {
-          setCurrentUser(null);
-          setAccessToken(null);
-        }}
-        spreadsheetConfig={spreadsheetConfig}
-        onUpdateConfig={(config) => setSpreadsheetConfig(config)}
-        participants={participants}
-        attendance={attendance}
-        submissions={submissions}
-        onShowToast={showToast}
-        isAdminMode={isAdminMode}
-        onRequestAdmin={() => setIsPinModalOpen(true)}
-      />
+      {isSpreadsheetModalOpen && (
+        <GoogleSheetsSyncModal
+          isOpen={isSpreadsheetModalOpen}
+          onClose={() => setIsSpreadsheetModalOpen(false)}
+          currentUser={currentUser}
+          accessToken={accessToken}
+          onAuthSuccess={(user, token) => {
+            setCurrentUser(user);
+            setAccessToken(token);
+            if (user.email?.toLowerCase().trim() === 'pembelajaranulfa@gmail.com') {
+              updateAdminMode(true);
+            }
+          }}
+          onAuthLogout={() => {
+            setCurrentUser(null);
+            setAccessToken(null);
+          }}
+          spreadsheetConfig={spreadsheetConfig}
+          onUpdateConfig={(config) => setSpreadsheetConfig(config)}
+          participants={participants}
+          attendance={attendance}
+          submissions={submissions}
+          onShowToast={showToast}
+          isAdminMode={isAdminMode}
+          onRequestAdmin={() => setIsPinModalOpen(true)}
+        />
+      )}
 
       {/* Admin Verification Modal */}
-      <AdminPinModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => {
-          setIsAdminMode(true);
-          showToast('Selamat Datang, Mode Pemilik & Panitia (pembelajaranulfa@gmail.com) Terverifikasi');
-        }}
-        onGoogleAuthSuccess={(user, token) => {
-          setCurrentUser(user);
-          setAccessToken(token);
-          setIsAdminMode(true);
-          showToast(`Berhasil masuk sebagai Pemilik (${user.email})`);
-        }}
-      />
+      {isPinModalOpen && (
+        <AdminPinModal
+          isOpen={isPinModalOpen}
+          onClose={() => setIsPinModalOpen(false)}
+          onSuccess={() => {
+            updateAdminMode(true);
+            showToast('Selamat Datang, Mode Pemilik & Panitia (pembelajaranulfa@gmail.com) Terverifikasi');
+          }}
+          onGoogleAuthSuccess={(user, token) => {
+            setCurrentUser(user);
+            setAccessToken(token);
+            updateAdminMode(true);
+            showToast(`Berhasil masuk sebagai Pemilik (${user.email})`);
+          }}
+        />
+      )}
 
       {/* Zoom Meeting Info & Join Modal */}
-      <ZoomModal
-        isOpen={isZoomModalOpen}
-        onClose={() => setIsZoomModalOpen(false)}
-      />
+      {isZoomModalOpen && (
+        <ZoomModal
+          isOpen={isZoomModalOpen}
+          onClose={() => setIsZoomModalOpen(false)}
+        />
+      )}
 
       {/* Footer */}
       <Footer

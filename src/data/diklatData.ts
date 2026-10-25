@@ -439,6 +439,21 @@ const generateInitialAttendance = (): AttendanceRecord[] => {
       notes: 'Hadir Sesi 5 Zoom Meeting Manajemen Promosi & Budaya Baca',
       verified: true,
     });
+
+    // Sesi 6: Pembangunan Organisasi Berbasis Moderasi dan Ekoteologi (Jum'at, 23 Oktober 2026)
+    records.push({
+      id: `att-${p.id}-sesi-6-seed`,
+      participantId: p.id,
+      participantName: p.name,
+      institution: p.institution,
+      city: p.city,
+      sessionId: 'sesi-6',
+      sessionTitle: 'Pembangunan Organisasi Berbasis Moderasi dan Ekoteologi',
+      timestamp: '2026-10-23 08.15 WIB',
+      status: 'Hadir',
+      notes: 'Hadir Sesi 6 Zoom Meeting Moderasi Beragama & Ekoteologi',
+      verified: true,
+    });
   });
   return records;
 };

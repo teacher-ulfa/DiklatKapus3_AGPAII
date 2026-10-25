@@ -13,7 +13,7 @@ interface AdminPinModalProps {
 }
 
 // Secret fallback passcodes (strictly confidential - never exposed in UI)
-const SECRET_ADMIN_PINS = ['ulfa2026', 'agpaii2026', 'panitia120jp'];
+const SECRET_ADMIN_PINS = ['1926', '2026', 'ulfa2026', 'agpaii2026', 'panitia120jp', '120jp', 'diklat2026', 'panitia'];
 
 export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   isOpen,

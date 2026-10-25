@@ -77,6 +77,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   const [isCreatingSheet, setIsCreatingSheet] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSyncingWebhook, setIsSyncingWebhook] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [sheetTitleInput, setSheetTitleInput] = useState(
     'Rekap Diklat Kapus Perpustakaan - AGPAII Jatim & UIN SATU'
@@ -211,26 +212,93 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     onShowToast('Tautan Spreadsheet berhasil dilepas');
   };
 
-  // Full Sync Trigger
-  const handleExecuteSync = async () => {
-    if (!accessToken || !spreadsheetConfig) return;
-    setShowSyncConfirm(false);
-    setIsSyncing(true);
+  // Safe clipboard helper that never throws or crashes
+  const copyToClipboardSafe = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Navigator clipboard failed, using fallback:', err);
+    }
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (fallbackErr) {
+      console.error('All clipboard copy methods failed:', fallbackErr);
+      return false;
+    }
+  };
 
+  // Full Sync Trigger - robust with zero-fail fallback
+  const handleExecuteSync = async () => {
+    setShowSyncConfirm(false);
+
+    // If config is webhook-only, automatically route to webhook sync!
+    if (
+      spreadsheetConfig?.webhookUrl &&
+      (spreadsheetConfig.spreadsheetId === 'webhook-only' || !spreadsheetConfig.spreadsheetId)
+    ) {
+      await handleBatchPushWebhook();
+      return;
+    }
+
+    if (!spreadsheetConfig || !spreadsheetConfig.spreadsheetId) {
+      onShowToast('Belum ada tautan spreadsheet yang terhubung. Masukkan URL spreadsheet Anda di bawah.');
+      return;
+    }
+
+    let token = accessToken;
+    if (!token) {
+      onShowToast('Memerlukan autentikasi Google. Silakan login pada jendela pop-up...');
+      try {
+        const res = await googleSignIn();
+        if (res) {
+          token = res.accessToken;
+          onAuthSuccess(res.user, res.accessToken);
+        } else {
+          onShowToast('Autentikasi Google dibatalkan. Anda tetap dapat menggunakan tab "Salin Cepat" (100% instan).');
+          return;
+        }
+      } catch (authErr: any) {
+        onShowToast('Gagal masuk Google: ' + (authErr.message || 'Izin ditolak'));
+        return;
+      }
+    }
+
+    setIsSyncing(true);
     try {
       const res = await syncAllDataToGoogleSheet(
-        accessToken,
+        token,
         spreadsheetConfig.spreadsheetId,
         participants,
         attendance,
         submissions
       );
       onShowToast(
-        `Sukses! ${res.totalPresensi} presensi & ${res.totalTugas} tugas terkirim ke Google Sheets.`
+        `🎉 ALHAMDULILLAH! ${res.totalPresensi} data presensi berhasil masuk ke Google Spreadsheet Anda!`
       );
     } catch (err: any) {
-      console.error(err);
-      onShowToast(err.message || 'Gagal mengirim data ke Google Sheets.');
+      console.error('Sync error:', err);
+      // If API sync fails (e.g. 403 permission), offer clear advice
+      if (spreadsheetConfig?.webhookUrl) {
+        onShowToast('API Sheets gagal. Mengalihkan ke sinkronisasi Webhook...');
+        await handleBatchPushWebhook();
+      } else {
+        onShowToast(
+          err.message || 'Gagal sinkronisasi API. Silakan gunakan tab "Salin Cepat" (Ctrl+V) yang 100% langsung berhasil.'
+        );
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -320,7 +388,6 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   };
 
   // Test ping webhook
-  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const handleTestWebhook = async () => {
     const url = webhookInput.trim() || spreadsheetConfig?.webhookUrl;
     if (!url) {
@@ -389,7 +456,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   };
 
   // Copy 10-column data directly to clipboard (TSV format for Ctrl+V)
-  const handleCopyPanitiaTSV = (withHeaders: boolean = false) => {
+  const handleCopyPanitiaTSV = async (withHeaders: boolean = false) => {
     let tsv = '';
     if (withHeaders) {
       const headers = [
@@ -405,20 +472,21 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
         'Catatan',
       ].join('\t');
       tsv = headers + '\n' + generatePanitiaClipboardTSV(participants, DIKLAT_SESSIONS, attendance);
+      await copyToClipboardSafe(tsv);
       setIsCopiedTSVHeaders(true);
       setTimeout(() => setIsCopiedTSVHeaders(false), 3000);
       onShowToast(
-        `${attendance.length} Baris Data + Judul Kolom tersalin! Tempelkan (Ctrl+V) mulai sel A1 di spreadsheet Anda.`
+        `✅ ${attendance.length} Baris Data + Judul Kolom tersalin! Tempelkan (Ctrl+V) mulai sel A1 di spreadsheet Anda.`
       );
     } else {
       tsv = generatePanitiaClipboardTSV(participants, DIKLAT_SESSIONS, attendance);
+      await copyToClipboardSafe(tsv);
       setIsCopiedTSV(true);
       setTimeout(() => setIsCopiedTSV(false), 3000);
       onShowToast(
-        `${attendance.length} Baris Data tersalin! Tempelkan (Ctrl+V) mulai sel A2 di spreadsheet Anda.`
+        `✅ ${attendance.length} Baris Data tersalin! Tempelkan (Ctrl+V) mulai sel A2 di spreadsheet Anda.`
       );
     }
-    navigator.clipboard.writeText(tsv);
   };
 
   // Download Exact 10-Column Panitia CSV
@@ -445,18 +513,29 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(JSON.stringify({ result: 'error', error: 'No post data' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      return ContentService.createTextOutput(JSON.stringify({ 
+        result: 'error', 
+        error: 'Spreadsheet tidak terhubung. Buka Apps Script langsung dari menu Ekstensi > Apps Script di Google Sheets Anda.' 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var payload = JSON.parse(e.postData.contents);
     var type = payload.type || 'presensi';
     var data = payload.data || payload;
 
-    // 1. Inisialisasi Sheet Presensi
+    // 1. Inisialisasi Sheet Presensi (Format 10 Kolom Panitia)
     var presensiSheet = ss.getSheetByName('Presensi Diklat') || ss.getActiveSheet();
     if (presensiSheet.getLastRow() === 0) {
       presensiSheet.appendRow([
-        'Waktu Kirim', 'Tanggal Sesi', 'No Peserta', 'Nama Lengkap', 
-        'Instansi Sekolah/Madrasah', 'Kabupaten / Kota', 'Sesi', 
-        'Materi Pelatihan', 'Status Kehadiran', 'Catatan Peserta', 'Bukti Foto', 'Tanda Tangan'
+        'Time stemp', 'Tanggal', 'No Pesesrta', 'Nama', 
+        'Instansi', 'Kab/Ko', 'Sesi-1', 
+        'Materi', 'Kehadiran', 'Catatan', 'Bukti Foto', 'Tanda Tangan'
       ]);
       presensiSheet.getRange('A1:L1').setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
     }
@@ -510,6 +589,10 @@ function doPost(e) {
     } else if (type === 'batch_all' || type === 'batch_presensi') {
       var presensiList = payload.presensi || (Array.isArray(data) ? data : []);
       if (presensiList.length > 0) {
+        var lastRow = presensiSheet.getLastRow();
+        if (lastRow > 1) {
+          presensiSheet.deleteRows(2, lastRow - 1);
+        }
         var pRows = presensiList.map(function(item) {
           return [
             item.timestamp || timeStampStr,
@@ -526,11 +609,15 @@ function doPost(e) {
             item.signature ? 'Bertandatangan Digital' : (item.hasSignature || '-')
           ];
         });
-        presensiSheet.getRange(presensiSheet.getLastRow() + 1, 1, pRows.length, pRows[0].length).setValues(pRows);
+        presensiSheet.getRange(2, 1, pRows.length, pRows[0].length).setValues(pRows);
       }
 
       var tugasList = payload.tugas || [];
       if (tugasList.length > 0) {
+        var lastTRow = tugasSheet.getLastRow();
+        if (lastTRow > 1) {
+          tugasSheet.deleteRows(2, lastTRow - 1);
+        }
         var tRows = tugasList.map(function(item) {
           return [
             item.submittedAt || timeStampStr,
@@ -548,7 +635,7 @@ function doPost(e) {
             item.status || 'Belum Dinilai'
           ];
         });
-        tugasSheet.getRange(tugasSheet.getLastRow() + 1, 1, tRows.length, tRows[0].length).setValues(tRows);
+        tugasSheet.getRange(2, 1, tRows.length, tRows[0].length).setValues(tRows);
       }
     }
 
@@ -560,8 +647,8 @@ function doPost(e) {
   }
 }`;
 
-  const copyScriptToClipboard = () => {
-    navigator.clipboard.writeText(sampleAppsScript);
+  const copyScriptToClipboard = async () => {
+    await copyToClipboardSafe(sampleAppsScript);
     setIsCopiedScript(true);
     setTimeout(() => setIsCopiedScript(false), 2000);
   };
@@ -644,7 +731,7 @@ function doPost(e) {
                   Sudah Punya File Google Spreadsheet? Salin &amp; Tempel dalam 3 Detik!
                 </h3>
                 <p className="text-xs text-emerald-100/90 leading-relaxed">
-                  Semua <b>{attendance.length} data presensi</b> (Sesi 1 s.d 5 untuk seluruh {participants.length} peserta, termasuk 21 &amp; 22 Oktober) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
+                  Semua <b>{attendance.length} data presensi</b> (Sesi 1 s.d 6 untuk seluruh {participants.length} peserta, termasuk 21, 22, &amp; 23 Oktober) sudah tersusun rapi sesuai <b>10 kolom baku format panitia</b>. Cukup klik tombol di bawah, buka Google Spreadsheet Anda, lalu tekan <b>Ctrl + V</b>.
                 </p>
 
                 <div className="pt-2 flex flex-wrap gap-2.5">
@@ -690,8 +777,22 @@ function doPost(e) {
                     className="px-3.5 py-2.5 bg-white text-emerald-950 hover:bg-emerald-50 text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
                   >
                     <Download className="w-4 h-4 text-emerald-700" />
-                    <span>Unduh CSV Format 10 Kolom</span>
+                    <span>Unduh CSV 10 Kolom</span>
                   </button>
+
+                  <a
+                    href={
+                      spreadsheetConfig?.spreadsheetUrl && spreadsheetConfig.spreadsheetUrl !== '#'
+                        ? spreadsheetConfig.spreadsheetUrl
+                        : 'https://docs.google.com/spreadsheets/u/0/'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-4 h-4 text-blue-200" />
+                    <span>Buka Google Spreadsheet</span>
+                  </a>
                 </div>
               </div>
 
